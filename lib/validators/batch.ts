@@ -24,7 +24,9 @@ export const createBatchSchema = z.object({
     .optional(),
 });
 
-export const updateBatchSchema = createBatchSchema.partial();
+export const updateBatchSchema = createBatchSchema.partial().extend({
+  is_archived: z.boolean().optional(),
+});
 
 export type CreateBatchInput = z.infer<typeof createBatchSchema>;
 export type UpdateBatchInput = z.infer<typeof updateBatchSchema>;
