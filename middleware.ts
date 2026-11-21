@@ -17,7 +17,7 @@ import { type NextRequest, NextResponse } from "next/server";
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   // Session refresh and role-based routing implemented in Milestone 1
   // once @supabase/ssr is installed and configured.
-  return NextResponse.next();
+  return NextResponse.next({ request });
 }
 
 export const config = {

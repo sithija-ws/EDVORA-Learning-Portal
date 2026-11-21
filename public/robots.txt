@@ -1,0 +1,4 @@
+User-agent: *
+Disallow: /
+
+# Edvora is a private tuition platform. All routes are disallowed for crawlers.
