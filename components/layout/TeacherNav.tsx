@@ -4,6 +4,7 @@
 import React from "react";
 import Link from "next/link";
 import { BookOpen, Users, LogOut } from "lucide-react";
+import { logout } from "@/actions/auth";
 
 export function TeacherNav() {
   return (
@@ -45,13 +46,15 @@ export function TeacherNav() {
 
         {/* User / Logout */}
         <div className="flex items-center gap-2">
-          <Link
-            href="/login"
-            className="inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <LogOut className="h-4 w-4" />
-            <span className="hidden sm:inline">Sign out</span>
-          </Link>
+          <form action={logout}>
+            <button
+              type="submit"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Sign out</span>
+            </button>
+          </form>
         </div>
       </div>
     </header>

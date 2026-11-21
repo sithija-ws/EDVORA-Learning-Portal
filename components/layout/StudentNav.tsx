@@ -5,6 +5,7 @@
 import React from "react";
 import Link from "next/link";
 import { Home, BookOpen, Bell, LogOut } from "lucide-react";
+import { logout } from "@/actions/auth";
 
 export function StudentNav() {
   return (
@@ -46,13 +47,15 @@ export function StudentNav() {
             </Link>
           </nav>
 
-          <Link
-            href="/login"
-            className="inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <LogOut className="h-4 w-4" />
-            <span>Sign out</span>
-          </Link>
+          <form action={logout}>
+            <button
+              type="submit"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Sign out</span>
+            </button>
+          </form>
         </div>
       </header>
 
@@ -69,13 +72,15 @@ export function StudentNav() {
             <span>Edvora</span>
           </Link>
 
-          <Link
-            href="/login"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
-            aria-label="Sign out"
-          >
-            <LogOut className="h-4 w-4" />
-          </Link>
+          <form action={logout}>
+            <button
+              type="submit"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
+              aria-label="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </form>
         </div>
       </header>
 

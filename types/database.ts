@@ -4,9 +4,7 @@
 // In a production project, these would be auto-generated via:
 //   npx supabase gen types typescript --project-id <ref> > types/database.ts
 //
-// For now, these are manually maintained to match the schema in
-// docs/ARCHITECTURE.md. Run the generation command after the Supabase
-// project is configured to keep them in sync.
+// Manually maintained to match migrations 00001 through 00005.
 
 export type Json =
   | string
@@ -44,13 +42,13 @@ export interface Database {
           is_archived?: boolean;
           created_at?: string;
         };
+        Relationships: [];
       };
       profiles: {
         Row: {
           id: string;
           full_name: string;
           role: "teacher" | "student";
-          batch_id: string | null;
           is_active: boolean;
           phone: string | null;
           created_at: string;
@@ -59,7 +57,6 @@ export interface Database {
           id: string;
           full_name: string;
           role: "teacher" | "student";
-          batch_id?: string | null;
           is_active?: boolean;
           phone?: string | null;
           created_at?: string;
@@ -68,11 +65,29 @@ export interface Database {
           id?: string;
           full_name?: string;
           role?: "teacher" | "student";
-          batch_id?: string | null;
           is_active?: boolean;
           phone?: string | null;
           created_at?: string;
         };
+        Relationships: [];
+      };
+      enrollments: {
+        Row: {
+          student_id: string;
+          batch_id: string;
+          created_at: string;
+        };
+        Insert: {
+          student_id: string;
+          batch_id: string;
+          created_at?: string;
+        };
+        Update: {
+          student_id?: string;
+          batch_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
       };
       lessons: {
         Row: {
@@ -108,6 +123,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       lesson_batches: {
         Row: {
@@ -122,6 +138,7 @@ export interface Database {
           lesson_id?: string;
           batch_id?: string;
         };
+        Relationships: [];
       };
       announcements: {
         Row: {
@@ -154,6 +171,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       announcement_batches: {
         Row: {
@@ -168,6 +186,7 @@ export interface Database {
           announcement_id?: string;
           batch_id?: string;
         };
+        Relationships: [];
       };
     };
     Views: Record<string, never>;
@@ -176,12 +195,18 @@ export interface Database {
         Args: Record<string, never>;
         Returns: string;
       };
-      get_my_batch_id: {
-        Args: Record<string, never>;
-        Returns: string;
-      };
       is_teacher: {
         Args: Record<string, never>;
+        Returns: boolean;
+      };
+      is_student: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      is_enrolled_in_batch: {
+        Args: {
+          p_batch_id: string;
+        };
         Returns: boolean;
       };
     };
