@@ -2,6 +2,7 @@
 // Teacher page to upload a new PDF study note.
 
 import React from "react";
+import { connection } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { NoteForm } from "@/components/notes/NoteForm";
@@ -18,6 +19,7 @@ interface NewNotePageProps {
 }
 
 export default async function NewNotePage({ searchParams }: NewNotePageProps) {
+  await connection();
   const { batchId } = await searchParams;
   const supabase = await createServerClient();
 

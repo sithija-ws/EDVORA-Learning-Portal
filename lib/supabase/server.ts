@@ -18,6 +18,7 @@
 import { createServerClient as createSupabaseServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 import type { Database } from "@/types/database";
 
 /**
@@ -27,6 +28,12 @@ import type { Database } from "@/types/database";
  * Use in: Server Components, Server Actions (reading data)
  */
 export async function createServerClient() {
+  try {
+    await connection();
+  } catch {
+    // connection() is only active during Server Component rendering; safe to ignore elsewhere
+  }
+
   const cookieStore = await cookies();
 
   return createSupabaseServerClient<Database>(
