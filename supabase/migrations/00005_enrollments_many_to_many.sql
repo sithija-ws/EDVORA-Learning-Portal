@@ -84,7 +84,7 @@ $$;
 
 ALTER FUNCTION public.get_my_role() OWNER TO postgres;
 REVOKE EXECUTE ON FUNCTION public.get_my_role() FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.get_my_role() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_my_role() TO authenticated, service_role;
 
 -- Returns true if the authenticated user is an active teacher
 CREATE OR REPLACE FUNCTION public.is_teacher()
@@ -105,7 +105,7 @@ $$;
 
 ALTER FUNCTION public.is_teacher() OWNER TO postgres;
 REVOKE EXECUTE ON FUNCTION public.is_teacher() FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.is_teacher() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_teacher() TO authenticated, service_role;
 
 -- Returns true if the authenticated user is an active student
 CREATE OR REPLACE FUNCTION public.is_student()
@@ -126,7 +126,7 @@ $$;
 
 ALTER FUNCTION public.is_student() OWNER TO postgres;
 REVOKE EXECUTE ON FUNCTION public.is_student() FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.is_student() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_student() TO authenticated, service_role;
 
 -- Returns true if the authenticated active student is enrolled in a non-archived batch
 CREATE OR REPLACE FUNCTION public.is_enrolled_in_batch(p_batch_id UUID)
@@ -151,7 +151,7 @@ $$;
 
 ALTER FUNCTION public.is_enrolled_in_batch(UUID) OWNER TO postgres;
 REVOKE EXECUTE ON FUNCTION public.is_enrolled_in_batch(UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.is_enrolled_in_batch(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_enrolled_in_batch(UUID) TO authenticated, service_role;
 
 -- ─── 8. REPLACE RLS POLICIES (EXPLICIT TARGET ROLES) ────────────────────────
 
@@ -321,8 +321,8 @@ REVOKE ALL PRIVILEGES ON
   public.announcement_batches
 FROM PUBLIC, anon;
 
--- Explicitly grant full CRUD to authenticated (RLS governs row authorization)
-GRANT SELECT, INSERT, UPDATE, DELETE ON
+-- Explicitly grant full CRUD to authenticated and service_role (RLS governs row authorization)
+GRANT ALL PRIVILEGES ON
   public.profiles,
   public.enrollments,
   public.batches,
@@ -330,7 +330,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON
   public.lesson_batches,
   public.announcements,
   public.announcement_batches
-TO authenticated;
+TO authenticated, service_role;
 
 -- Explicitly grant SELECT to anon (RLS yields 0 rows cleanly without function errors)
 GRANT SELECT ON
