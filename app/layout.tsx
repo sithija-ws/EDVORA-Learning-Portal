@@ -16,6 +16,14 @@ export const metadata: Metadata = {
   },
   description:
     "Edvora — Engineering Technology tuition learning platform. Access your batch lessons and announcements.",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+  },
   robots: {
     index: false, // Private platform — keep out of search engines
     follow: false,
