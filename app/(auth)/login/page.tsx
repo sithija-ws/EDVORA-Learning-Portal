@@ -31,9 +31,13 @@ export default function LoginPage() {
       <div className="relative w-full max-w-sm space-y-6">
         {/* Brand Header */}
         <div className="space-y-3 text-center">
-          <div className="relative mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-2xl font-black text-primary-foreground shadow-xl shadow-primary/25 ring-1 ring-primary/20 select-none transition-transform hover:scale-105">
-            <span>E</span>
-            <span className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-2 border-background bg-emerald-500" />
+          <div className="relative mx-auto flex h-16 w-16 items-center justify-center transition-transform hover:scale-105">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="Edvora"
+              className="h-16 w-16 object-contain drop-shadow-md"
+            />
           </div>
 
           <div className="space-y-1">

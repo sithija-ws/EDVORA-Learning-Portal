@@ -18,10 +18,11 @@ export const metadata: Metadata = {
     "Edvora — Engineering Technology tuition learning platform. Access your batch lessons and announcements.",
   icons: {
     icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon.png", type: "image/png" },
+      { url: "/logo.png", type: "image/png" },
     ],
     apple: [
-      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/apple-touch-icon.png", type: "image/png" },
     ],
   },
   robots: {

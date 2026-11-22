@@ -37,10 +37,12 @@ export function StudentNav() {
             href="/home"
             className="flex items-center gap-2.5 transition-transform hover:scale-[1.02]"
           >
-            <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-black text-primary-foreground shadow-sm">
-              <span>E</span>
-              <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-background bg-emerald-500" />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="Edvora"
+              className="h-8 w-8 object-contain"
+            />
             <div className="flex flex-col">
               <span className="text-base font-black tracking-tight text-foreground leading-none">
                 Edvora
@@ -89,10 +91,12 @@ export function StudentNav() {
       <header className="sticky top-0 z-40 border-b border-border/60 bg-card/90 backdrop-blur-md sm:hidden">
         <div className="flex h-12 items-center justify-between px-4">
           <Link href="/home" className="flex items-center gap-2">
-            <div className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-black text-primary-foreground shadow-xs">
-              <span>E</span>
-              <span className="absolute -bottom-0.5 -right-0.5 h-1.5 w-1.5 rounded-full border border-background bg-emerald-500" />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="Edvora"
+              className="h-7 w-7 object-contain"
+            />
             <div className="flex items-baseline gap-1.5">
               <span className="text-sm font-black tracking-tight">Edvora</span>
               <span className="text-[10px] font-mono text-muted-foreground">STUDENT</span>

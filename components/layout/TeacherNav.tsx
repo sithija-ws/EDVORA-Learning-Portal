@@ -35,10 +35,12 @@ export function TeacherNav() {
             href="/dashboard"
             className="flex items-center gap-2.5 transition-transform hover:scale-[1.02]"
           >
-            <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-black text-primary-foreground shadow-sm">
-              <span>E</span>
-              <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-background bg-emerald-500" />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="Edvora"
+              className="h-8 w-8 object-contain"
+            />
             <div className="flex flex-col">
               <span className="text-base font-black tracking-tight text-foreground leading-none">
                 Edvora
