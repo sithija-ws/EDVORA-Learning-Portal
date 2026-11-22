@@ -25,20 +25,18 @@ export default async function TeacherAnnouncementsPage({
   const { batchId } = await searchParams;
   const supabase = await createServerClient();
 
-  // 1. Fetch batches
-  const { data: batchesData } = await supabase
-    .from("batches")
-    .select("*")
-    .order("year", { ascending: false })
-    .order("name", { ascending: true });
+  // 1. Fetch batches and announcement_batches junctions concurrently in parallel
+  const [{ data: batchesData }, { data: annBatchesData }] = await Promise.all([
+    supabase
+      .from("batches")
+      .select("*")
+      .order("year", { ascending: false })
+      .order("name", { ascending: true }),
+    supabase.from("announcement_batches").select("announcement_id, batch_id"),
+  ]);
 
   const batches: Batch[] = batchesData ?? [];
   const batchMap = new Map(batches.map((b) => [b.id, b]));
-
-  // 2. Fetch announcement_batches junctions
-  const { data: annBatchesData } = await supabase
-    .from("announcement_batches")
-    .select("announcement_id, batch_id");
 
   const annToBatchesMap = new Map<string, Batch[]>();
   const scopedAnnIdsForBatch = new Set<string>();

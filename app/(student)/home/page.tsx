@@ -35,100 +35,99 @@ export default async function StudentHomePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // 2. Profile
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, is_active, role")
-    .eq("id", user.id)
-    .single();
+  // 2. Fetch profile & enrollments concurrently in a single parallel roundtrip
+  const [{ data: profile }, { data: enrollments }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("full_name, is_active, role")
+      .eq("id", user.id)
+      .single(),
+    supabase
+      .from("enrollments")
+      .select("batch_id")
+      .eq("student_id", user.id),
+  ]);
 
   if (!profile || !profile.is_active) redirect("/disabled");
-
-  // 3. Enrolled batches
-  const { data: enrollments } = await supabase
-    .from("enrollments")
-    .select("batch_id")
-    .eq("student_id", user.id);
 
   const enrolledBatchIds = enrollments?.map((e) => e.batch_id) ?? [];
 
   let batches: Batch[] = [];
-  if (enrolledBatchIds.length > 0) {
-    const { data: batchesData } = await supabase
-      .from("batches")
-      .select("*")
-      .in("id", enrolledBatchIds)
-      .order("year", { ascending: false });
-    batches = batchesData ?? [];
-  }
-
-  // 4. Fetch lessons assigned to enrolled batches
   let lessons: Lesson[] = [];
+  let recentAnnouncements: Announcement[] = [];
+  let recentNotes: Note[] = [];
+
   if (enrolledBatchIds.length > 0) {
-    const { data: lessonBatches } = await supabase
-      .from("lesson_batches")
-      .select("lesson_id")
-      .in("batch_id", enrolledBatchIds);
+    // 3. Stage 1 concurrent fetch: batches, junction mappings, and notices in parallel
+    const [
+      batchesRes,
+      lessonBatchesRes,
+      annBatchesRes,
+      noteBatchesRes,
+      annDataRes,
+    ] = await Promise.all([
+      supabase
+        .from("batches")
+        .select("*")
+        .in("id", enrolledBatchIds)
+        .order("year", { ascending: false }),
+      supabase
+        .from("lesson_batches")
+        .select("lesson_id")
+        .in("batch_id", enrolledBatchIds),
+      supabase
+        .from("announcement_batches")
+        .select("announcement_id")
+        .in("batch_id", enrolledBatchIds),
+      supabase
+        .from("note_batches")
+        .select("note_id")
+        .in("batch_id", enrolledBatchIds),
+      supabase
+        .from("announcements")
+        .select("*")
+        .order("is_pinned", { ascending: false })
+        .order("created_at", { ascending: false }),
+    ]);
+
+    batches = batchesRes.data ?? [];
 
     const lessonIds = Array.from(
-      new Set(lessonBatches?.map((lb) => lb.lesson_id) ?? [])
+      new Set(lessonBatchesRes.data?.map((lb) => lb.lesson_id) ?? [])
+    );
+    const scopedAnnIds = annBatchesRes.data?.map((ab) => ab.announcement_id) ?? [];
+    const noteIds = Array.from(
+      new Set(noteBatchesRes.data?.map((nb) => nb.note_id) ?? [])
     );
 
-    if (lessonIds.length > 0) {
-      const { data: lessonsData } = await supabase
-        .from("lessons")
-        .select("*")
-        .in("id", lessonIds)
-        .order("sort_order", { ascending: true })
-        .order("created_at", { ascending: false })
-        .limit(6);
-      lessons = lessonsData ?? [];
-    }
-  }
-
-  // 5. Fetch announcements
-  let recentAnnouncements: Announcement[] = [];
-  if (enrolledBatchIds.length > 0) {
-    const { data: annBatches } = await supabase
-      .from("announcement_batches")
-      .select("announcement_id")
-      .in("batch_id", enrolledBatchIds);
-
-    const scopedAnnIds = annBatches?.map((ab) => ab.announcement_id) ?? [];
-
-    const { data: annData } = await supabase
-      .from("announcements")
-      .select("*")
-      .order("is_pinned", { ascending: false })
-      .order("created_at", { ascending: false });
-
-    const allNotices = annData ?? [];
+    const allNotices = annDataRes.data ?? [];
     recentAnnouncements = allNotices
       .filter((a) => a.is_broadcast || scopedAnnIds.includes(a.id))
       .slice(0, 3);
-  }
 
-  // 6. Fetch notes assigned to student's enrolled batches
-  let recentNotes: Note[] = [];
-  if (enrolledBatchIds.length > 0) {
-    const { data: noteBatches } = await supabase
-      .from("note_batches")
-      .select("note_id")
-      .in("batch_id", enrolledBatchIds);
+    // 4. Stage 2 concurrent fetch: lessons and notes records in parallel
+    const [lessonsRes, notesRes] = await Promise.all([
+      lessonIds.length > 0
+        ? supabase
+            .from("lessons")
+            .select("*")
+            .in("id", lessonIds)
+            .order("sort_order", { ascending: true })
+            .order("created_at", { ascending: false })
+            .limit(6)
+        : Promise.resolve({ data: [] }),
+      noteIds.length > 0
+        ? supabase
+            .from("notes")
+            .select("*")
+            .in("id", noteIds)
+            .order("created_at", { ascending: false })
+            .limit(3)
+        : Promise.resolve({ data: [] }),
+    ]);
 
-    const noteIds = Array.from(
-      new Set(noteBatches?.map((nb) => nb.note_id) ?? [])
-    );
-
-    if (noteIds.length > 0) {
-      const { data: notesData } = await supabase
-        .from("notes")
-        .select("*")
-        .in("id", noteIds)
-        .order("created_at", { ascending: false })
-        .limit(3);
-      recentNotes = notesData ?? [];
-    }
+    lessons = (lessonsRes.data as Lesson[]) ?? [];
+    recentNotes = (notesRes.data as Note[]) ?? [];
   }
 
   const firstName = profile.full_name.split(" ")[0];

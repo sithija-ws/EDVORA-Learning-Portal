@@ -18,11 +18,28 @@ import {
 } from "@/lib/constants";
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
-  const { supabaseResponse, user, supabase } = await updateSession(request);
   const { pathname } = request.nextUrl;
+  const isPublicRoute = pathname === LOGIN_PATH || pathname === DISABLED_PATH;
 
-  const isPublicRoute =
-    pathname === LOGIN_PATH || pathname === DISABLED_PATH;
+  // ── Performance Fast-Path ────────────────────────────────────────────────
+  // Check if any Supabase session cookie exists.
+  // If an unauthenticated visitor accesses /login with no cookies, bypass
+  // all Supabase Auth network roundtrips completely for instant edge response.
+  const hasAuthCookie = request.cookies
+    .getAll()
+    .some((c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"));
+
+  if (!hasAuthCookie) {
+    if (!isPublicRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = LOGIN_PATH;
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next();
+  }
+
+  // ── Authenticated Flow ──────────────────────────────────────────────────
+  const { supabaseResponse, user, supabase } = await updateSession(request);
 
   // 1. Unauthenticated users
   if (!user) {

@@ -19,17 +19,17 @@ export const metadata = {
 export default async function TeacherDashboardPage() {
   const supabase = await createServerClient();
 
-  const { data: batchesData } = await supabase
-    .from("batches")
-    .select("*")
-    .order("year", { ascending: false })
-    .order("name", { ascending: true });
+  // Fetch batches and all enrollments concurrently in a single parallel roundtrip
+  const [{ data: batchesData }, { data: enrollmentsData }] = await Promise.all([
+    supabase
+      .from("batches")
+      .select("*")
+      .order("year", { ascending: false })
+      .order("name", { ascending: true }),
+    supabase.from("enrollments").select("batch_id"),
+  ]);
 
   const batches: Batch[] = batchesData ?? [];
-
-  const { data: enrollmentsData } = await supabase
-    .from("enrollments")
-    .select("batch_id");
 
   const countMap: Record<string, number> = {};
   enrollmentsData?.forEach((e) => {

@@ -35,22 +35,22 @@ export default async function StudentLessonsPage({
     redirect("/login");
   }
 
-  // 2. Fetch profile to check active status
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_active, role")
-    .eq("id", user.id)
-    .single();
+  // 2. Fetch profile & enrolled batches concurrently in parallel
+  const [{ data: profile }, { data: enrollments }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("is_active, role")
+      .eq("id", user.id)
+      .single(),
+    supabase
+      .from("enrollments")
+      .select("batch_id")
+      .eq("student_id", user.id),
+  ]);
 
   if (!profile || !profile.is_active) {
     redirect("/disabled");
   }
-
-  // 3. Fetch student's enrolled batches
-  const { data: enrollments } = await supabase
-    .from("enrollments")
-    .select("batch_id")
-    .eq("student_id", user.id);
 
   const enrolledBatchIds = enrollments?.map((e) => e.batch_id) ?? [];
 

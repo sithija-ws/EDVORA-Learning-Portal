@@ -35,93 +35,67 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
   const { batchId } = await params;
   const supabase = await createServerClient();
 
-  // 1. Fetch batch information
-  const { data: batch } = await supabase
-    .from("batches")
-    .select("*")
-    .eq("id", batchId)
-    .single();
+  // 1. Fetch batch information, enrollments, and all junction mappings concurrently in parallel
+  const [
+    batchRes,
+    enrollmentsRes,
+    batchLessonsRes,
+    batchAnnRes,
+    announcementsRes,
+    batchNoteRes,
+  ] = await Promise.all([
+    supabase.from("batches").select("*").eq("id", batchId).single(),
+    supabase.from("enrollments").select("student_id, created_at").eq("batch_id", batchId),
+    supabase.from("lesson_batches").select("lesson_id").eq("batch_id", batchId),
+    supabase.from("announcement_batches").select("announcement_id").eq("batch_id", batchId),
+    supabase.from("announcements").select("*").order("is_pinned", { ascending: false }).order("created_at", { ascending: false }),
+    supabase.from("note_batches").select("note_id").eq("batch_id", batchId),
+  ]);
 
+  const batch = batchRes.data;
   if (!batch) {
     notFound();
   }
 
-  // 2. Fetch enrolled student IDs
-  const { data: enrollments } = await supabase
-    .from("enrollments")
-    .select("student_id, created_at")
-    .eq("batch_id", batchId);
+  const studentIds = enrollmentsRes.data?.map((e) => e.student_id) ?? [];
+  const lessonIds = batchLessonsRes.data?.map((lb) => lb.lesson_id) ?? [];
+  const scopedAnnIds = batchAnnRes.data?.map((ab) => ab.announcement_id) ?? [];
+  const noteIds = batchNoteRes.data?.map((nb) => nb.note_id) ?? [];
 
-  const studentIds = enrollments?.map((e) => e.student_id) ?? [];
-  let students: Profile[] = [];
-
-  if (studentIds.length > 0) {
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("*")
-      .in("id", studentIds)
-      .order("full_name", { ascending: true });
-
-    students = profiles ?? [];
-  }
-
-  // 3. Fetch lessons assigned to this batch
-  const { data: batchLessonsData } = await supabase
-    .from("lesson_batches")
-    .select("lesson_id")
-    .eq("batch_id", batchId);
-
-  const lessonIds = batchLessonsData?.map((lb) => lb.lesson_id) ?? [];
-  let lessons: Lesson[] = [];
-
-  if (lessonIds.length > 0) {
-    const { data: lessonsData } = await supabase
-      .from("lessons")
-      .select("*")
-      .in("id", lessonIds)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: false });
-
-    lessons = lessonsData ?? [];
-  }
-
-  // 4. Fetch announcements relevant to this batch
-  const { data: batchAnnData } = await supabase
-    .from("announcement_batches")
-    .select("announcement_id")
-    .eq("batch_id", batchId);
-
-  const scopedAnnIds = batchAnnData?.map((ab) => ab.announcement_id) ?? [];
-
-  const { data: announcementsData } = await supabase
-    .from("announcements")
-    .select("*")
-    .order("is_pinned", { ascending: false })
-    .order("created_at", { ascending: false });
-
-  const allAnnouncements: Announcement[] = announcementsData ?? [];
+  const allAnnouncements: Announcement[] = announcementsRes.data ?? [];
   const announcements = allAnnouncements.filter(
     (a) => a.is_broadcast || scopedAnnIds.includes(a.id)
   );
 
-  // 5. Fetch notes assigned to this batch
-  const { data: batchNoteData } = await supabase
-    .from("note_batches")
-    .select("note_id")
-    .eq("batch_id", batchId);
+  // 2. Fetch full students, lessons, and notes concurrently in parallel
+  const [profilesRes, lessonsRes, notesRes] = await Promise.all([
+    studentIds.length > 0
+      ? supabase
+          .from("profiles")
+          .select("*")
+          .in("id", studentIds)
+          .order("full_name", { ascending: true })
+      : Promise.resolve({ data: [] }),
+    lessonIds.length > 0
+      ? supabase
+          .from("lessons")
+          .select("*")
+          .in("id", lessonIds)
+          .order("sort_order", { ascending: true })
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [] }),
+    noteIds.length > 0
+      ? supabase
+          .from("notes")
+          .select("*")
+          .in("id", noteIds)
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [] }),
+  ]);
 
-  const noteIds = batchNoteData?.map((nb) => nb.note_id) ?? [];
-  let notes: Note[] = [];
-
-  if (noteIds.length > 0) {
-    const { data: notesData } = await supabase
-      .from("notes")
-      .select("*")
-      .in("id", noteIds)
-      .order("created_at", { ascending: false });
-
-    notes = notesData ?? [];
-  }
+  const students: Profile[] = (profilesRes.data as Profile[]) ?? [];
+  const lessons: Lesson[] = (lessonsRes.data as Lesson[]) ?? [];
+  const notes: Note[] = (notesRes.data as Note[]) ?? [];
 
   return (
     <div>

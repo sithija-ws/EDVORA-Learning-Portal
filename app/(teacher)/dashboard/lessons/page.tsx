@@ -25,20 +25,18 @@ export default async function TeacherLessonsPage({
   const { batchId } = await searchParams;
   const supabase = await createServerClient();
 
-  // 1. Fetch all batches for filter tabs/badges
-  const { data: batchesData } = await supabase
-    .from("batches")
-    .select("*")
-    .order("year", { ascending: false })
-    .order("name", { ascending: true });
+  // 1. Fetch all batches and lesson_batches junctions concurrently in parallel
+  const [{ data: batchesData }, { data: lessonBatchesData }] = await Promise.all([
+    supabase
+      .from("batches")
+      .select("*")
+      .order("year", { ascending: false })
+      .order("name", { ascending: true }),
+    supabase.from("lesson_batches").select("lesson_id, batch_id"),
+  ]);
 
   const batches: Batch[] = batchesData ?? [];
   const batchMap = new Map(batches.map((b) => [b.id, b]));
-
-  // 2. Fetch all lesson_batches junctions
-  const { data: lessonBatchesData } = await supabase
-    .from("lesson_batches")
-    .select("lesson_id, batch_id");
 
   // Map lessonId -> array of Batch
   const lessonToBatchesMap = new Map<string, Batch[]>();

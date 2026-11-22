@@ -25,15 +25,34 @@ export default async function TeacherNotesPage({
   const { batchId } = await searchParams;
   const supabase = await createServerClient();
 
-  // 1. Fetch all batches
-  const { data: batchesData } = await supabase
-    .from("batches")
-    .select("*")
-    .order("year", { ascending: false })
-    .order("name", { ascending: true });
+  // 1. Fetch all batches and note-batch junction mappings concurrently in parallel
+  const [{ data: batchesData }, { data: allNoteBatches }] = await Promise.all([
+    supabase
+      .from("batches")
+      .select("*")
+      .order("year", { ascending: false })
+      .order("name", { ascending: true }),
+    supabase.from("note_batches").select("note_id, batch_id"),
+  ]);
 
   const batches: Batch[] = batchesData ?? [];
   const batchMap = new Map(batches.map((b) => [b.id, b]));
+
+  // Build noteId -> Batch[] map in memory
+  const noteToBatchesMap = new Map<string, Batch[]>();
+  const scopedNoteIds = new Set<string>();
+
+  allNoteBatches?.forEach((nb) => {
+    const b = batchMap.get(nb.batch_id);
+    if (b) {
+      const existing = noteToBatchesMap.get(nb.note_id) || [];
+      existing.push(b);
+      noteToBatchesMap.set(nb.note_id, existing);
+    }
+    if (batchId && nb.batch_id === batchId) {
+      scopedNoteIds.add(nb.note_id);
+    }
+  });
 
   // 2. Fetch notes
   let notesQuery = supabase
@@ -42,37 +61,12 @@ export default async function TeacherNotesPage({
     .order("created_at", { ascending: false });
 
   if (batchId) {
-    const { data: noteBatchesData } = await supabase
-      .from("note_batches")
-      .select("note_id")
-      .eq("batch_id", batchId);
-
-    const noteIds = noteBatchesData?.map((nb) => nb.note_id) ?? [];
+    const noteIds = Array.from(scopedNoteIds);
     notesQuery = notesQuery.in("id", noteIds.length > 0 ? noteIds : ["00000000-0000-0000-0000-000000000000"]);
   }
 
   const { data: notesData } = await notesQuery;
   const notes: Note[] = notesData ?? [];
-
-  // 3. Fetch batch assignments for notes
-  const noteIds = notes.map((n) => n.id);
-  const noteToBatchesMap = new Map<string, Batch[]>();
-
-  if (noteIds.length > 0) {
-    const { data: noteBatches } = await supabase
-      .from("note_batches")
-      .select("note_id, batch_id")
-      .in("note_id", noteIds);
-
-    noteBatches?.forEach((nb) => {
-      const b = batchMap.get(nb.batch_id);
-      if (b) {
-        const existing = noteToBatchesMap.get(nb.note_id) || [];
-        existing.push(b);
-        noteToBatchesMap.set(nb.note_id, existing);
-      }
-    });
-  }
 
   return (
     <div>
