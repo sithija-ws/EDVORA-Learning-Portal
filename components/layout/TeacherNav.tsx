@@ -59,6 +59,7 @@ export function TeacherNav() {
                 <Link
                   key={href}
                   href={href}
+                  prefetch={true}
                   className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all duration-200 ${
                     active
                       ? "bg-primary text-primary-foreground shadow-xs"
@@ -98,6 +99,7 @@ export function TeacherNav() {
             <Link
               key={href}
               href={href}
+              prefetch={true}
               className={`flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all ${
                 active
                   ? "bg-primary text-primary-foreground shadow-xs"

@@ -61,6 +61,7 @@ export function StudentNav() {
                 <Link
                   key={href}
                   href={href}
+                  prefetch={true}
                   className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all duration-200 ${
                     active
                       ? "bg-primary text-primary-foreground shadow-xs"
@@ -127,6 +128,7 @@ export function StudentNav() {
               <Link
                 key={href}
                 href={href}
+                prefetch={true}
                 className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[11px] font-bold transition-all duration-200 active:scale-95 ${
                   active
                     ? "bg-primary text-primary-foreground shadow-xs"

@@ -5,10 +5,14 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
 
-  // ─── Server Actions Body Size Limit (Allow 50 MB PDF notes + headers) ────
+  // ─── Server Actions & Client Cache Stale Times ────────────────────────────
   experimental: {
     serverActions: {
       bodySizeLimit: "55mb",
+    },
+    staleTimes: {
+      dynamic: 30,
+      static: 180,
     },
   },
 
