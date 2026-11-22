@@ -43,8 +43,8 @@ interface RootLayoutProps {
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="en" className={`${geistSans.variable} h-full`}>
-      <body className="min-h-full bg-background text-foreground antialiased">
+    <html lang="en" className={`${geistSans.variable} h-full`} suppressHydrationWarning>
+      <body className="min-h-full bg-background text-foreground antialiased" suppressHydrationWarning>
         {children}
         <Toaster position="top-right" />
       </body>

@@ -43,6 +43,7 @@ export function LoginForm() {
             required
             disabled={isPending}
             placeholder="Username or email"
+            suppressHydrationWarning
             className="h-11 rounded-xl border-border bg-muted/20 pl-10 text-sm transition-all focus:bg-background focus:ring-2 focus:ring-primary/20"
           />
         </div>
@@ -65,12 +66,14 @@ export function LoginForm() {
             required
             disabled={isPending}
             placeholder="••••••••••••"
+            suppressHydrationWarning
             className="h-11 rounded-xl border-border bg-muted/20 pl-10 pr-11 text-sm transition-all focus:bg-background focus:ring-2 focus:ring-primary/20"
           />
           <button
             type="button"
             onClick={() => setShowPassword((prev) => !prev)}
             tabIndex={-1}
+            suppressHydrationWarning
             className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             aria-label={showPassword ? "Hide password" : "Show password"}
           >
@@ -87,6 +90,7 @@ export function LoginForm() {
       <Button
         type="submit"
         disabled={isPending}
+        suppressHydrationWarning
         className="w-full h-11 rounded-xl bg-primary text-sm font-bold text-primary-foreground shadow-md transition-all hover:bg-primary/90 active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
       >
         {isPending ? (
