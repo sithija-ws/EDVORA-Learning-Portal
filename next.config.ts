@@ -5,6 +5,13 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
 
+  // ─── Server Actions Body Size Limit (Allow 50 MB PDF notes + headers) ────
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "55mb",
+    },
+  },
+
   // ─── Tailwind v4 via Turbopack ────────────────────────────────────────────
   turbopack: {
     rules: {

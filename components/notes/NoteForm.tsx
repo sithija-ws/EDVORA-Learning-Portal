@@ -32,6 +32,7 @@ export function NoteForm({
 
   const [selectedBatches, setSelectedBatches] = useState<Set<string>>(initialBatchIds);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
   const [showExternalUrl, setShowExternalUrl] = useState(false);
 
   const boundAction = isEditing
@@ -42,6 +43,13 @@ export function NoteForm({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
+    if (file && file.size > 50 * 1024 * 1024) {
+      setFileError("File exceeds the 50 MB limit. Please select a smaller PDF or use an external document link.");
+      setSelectedFile(null);
+      e.target.value = "";
+      return;
+    }
+    setFileError(null);
     setSelectedFile(file);
   };
 
@@ -73,13 +81,13 @@ export function NoteForm({
 
   return (
     <form action={formAction} className="space-y-6 max-w-xl">
-      {state?.error && (
+      {(state?.error || fileError) && (
         <div
           role="alert"
           className="flex items-center gap-2.5 rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs font-semibold text-destructive animate-in fade-in-50"
         >
           <AlertCircle className="h-4 w-4 shrink-0" />
-          <span>{state.error}</span>
+          <span>{fileError || state?.error}</span>
         </div>
       )}
 
