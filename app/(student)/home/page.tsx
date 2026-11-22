@@ -178,7 +178,7 @@ export default async function StudentHomePage() {
                 Welcome back, {firstName}
               </h1>
               <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                Engineering Technology Tuition Portal · Ready for your study session?
+                Learning Portal · Ready for your study session?
               </p>
             </div>
 

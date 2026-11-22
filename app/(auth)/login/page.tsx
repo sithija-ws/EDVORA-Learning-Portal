@@ -7,7 +7,7 @@ import { CreditsFooter } from "@/components/layout/CreditsFooter";
 
 export const metadata: Metadata = {
   title: "Sign In – Edvora",
-  description: "Sign in to access your Engineering Technology tuition batch.",
+  description: "Sign in to access your tuition batch.",
 };
 
 export default function LoginPage() {
@@ -57,13 +57,7 @@ export default function LoginPage() {
         </div>
 
         {/* Subtle Minimal Footer & Credits */}
-        <div className="space-y-3 pt-1">
-          <div className="text-center">
-            <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/60">
-              Engineering Technology A/L
-            </p>
-          </div>
-
+        <div className="pt-2">
           <CreditsFooter variant="minimal" />
         </div>
       </div>

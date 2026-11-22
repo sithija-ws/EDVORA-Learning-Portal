@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     template: "%s | Edvora",
   },
   description:
-    "Edvora — Engineering Technology tuition learning platform. Access your batch lessons and announcements.",
+    "Edvora — Learning management platform. Access your batch lessons, notes, and announcements.",
   icons: {
     icon: [
       { url: "/icon.png", type: "image/png" },

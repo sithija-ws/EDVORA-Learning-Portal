@@ -28,7 +28,7 @@ export function CreditsFooter({ variant = "minimal", className = "" }: CreditsFo
         <div className="flex items-center gap-2">
           <span className="font-black tracking-tight text-foreground">Edvora</span>
           <span className="text-muted-foreground/40">·</span>
-          <span>Engineering Technology Tuition Portal</span>
+          <span>Learning Portal</span>
         </div>
 
         <div className="flex items-center gap-1.5 text-[11px]">

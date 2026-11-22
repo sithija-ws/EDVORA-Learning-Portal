@@ -48,7 +48,7 @@ export function StudentNav() {
                 Edvora
               </span>
               <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground mt-0.5">
-                Eng Tech Portal
+                Student Portal
               </span>
             </div>
           </Link>
