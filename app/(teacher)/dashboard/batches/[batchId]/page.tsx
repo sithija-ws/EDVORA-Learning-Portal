@@ -8,8 +8,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StudentTable } from "@/components/students/StudentTable";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Users, BookOpen, Bell, Archive } from "lucide-react";
-import type { Profile } from "@/types";
+import { Plus, Edit, Users, BookOpen, Bell, Archive, Play } from "lucide-react";
+import type { Profile, Lesson } from "@/types";
 
 export const instant = false;
 
@@ -63,6 +63,26 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
       .order("full_name", { ascending: true });
 
     students = profiles ?? [];
+  }
+
+  // 3. Fetch lessons assigned to this batch
+  const { data: batchLessonsData } = await supabase
+    .from("lesson_batches")
+    .select("lesson_id")
+    .eq("batch_id", batchId);
+
+  const lessonIds = batchLessonsData?.map((lb) => lb.lesson_id) ?? [];
+  let lessons: Lesson[] = [];
+
+  if (lessonIds.length > 0) {
+    const { data: lessonsData } = await supabase
+      .from("lessons")
+      .select("*")
+      .in("id", lessonIds)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: false });
+
+    lessons = lessonsData ?? [];
   }
 
   return (
@@ -127,22 +147,72 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
           <StudentTable batchId={batch.id} students={students} />
         </section>
 
-        {/* Milestone 3 & 4 Preview Sections */}
+        {/* Milestone 3 & 4 Sections */}
         <div className="grid gap-6 sm:grid-cols-2 pt-4 border-t">
           {/* Lessons Section */}
           <section className="rounded-xl border bg-card p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-indigo-500" />
-              <h3 className="text-base font-semibold text-foreground">
-                Lessons
-              </h3>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-indigo-500" />
+                <h3 className="text-base font-semibold text-foreground">
+                  Lessons ({lessons.length})
+                </h3>
+              </div>
+              <Link
+                href={`/dashboard/lessons/new?batchId=${batch.id}`}
+                className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add Lesson</span>
+              </Link>
             </div>
             <p className="text-xs text-muted-foreground">
-              Assign unlisted YouTube video lessons to this batch.
+              Video lessons assigned to {batch.name}.
             </p>
-            <div className="rounded-lg bg-muted/40 p-4 text-center text-xs text-muted-foreground">
-              Lessons management will be implemented in Milestone 3.
-            </div>
+
+            {lessons.length === 0 ? (
+              <div className="rounded-lg bg-muted/40 p-5 text-center text-xs text-muted-foreground">
+                <p>No lessons assigned to this batch yet.</p>
+                <Link
+                  href={`/dashboard/lessons/new?batchId=${batch.id}`}
+                  className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span>Assign first lesson</span>
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {lessons.slice(0, 5).map((l) => (
+                  <Link
+                    key={l.id}
+                    href={`/dashboard/lessons/${l.id}`}
+                    className="flex items-center justify-between rounded-lg border p-2.5 hover:bg-muted/50 transition-colors text-xs"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-indigo-50 text-indigo-600">
+                        <Play className="h-3.5 w-3.5 fill-current" />
+                      </div>
+                      <span className="truncate font-medium text-foreground">
+                        {l.title}
+                      </span>
+                    </div>
+                    <span className="shrink-0 text-[11px] text-muted-foreground ml-2">
+                      #{l.sort_order}
+                    </span>
+                  </Link>
+                ))}
+
+                {lessons.length > 5 && (
+                  <Link
+                    href={`/dashboard/lessons?batchId=${batch.id}`}
+                    className="block text-center text-xs font-medium text-primary hover:underline pt-1"
+                  >
+                    View all {lessons.length} lessons →
+                  </Link>
+                )}
+              </div>
+            )}
           </section>
 
           {/* Announcements Section */}
