@@ -58,6 +58,7 @@ export async function login(
     });
 
   if (authError || !authData.user) {
+    console.error("Login attempt failed:", authError?.message);
     // Return a generic error to prevent username enumeration
     return {
       success: false,
@@ -74,6 +75,7 @@ export async function login(
     .single();
 
   if (profileError || !profile) {
+    console.error("Profile lookup failed:", profileError?.message);
     await supabase.auth.signOut();
     return {
       success: false,
