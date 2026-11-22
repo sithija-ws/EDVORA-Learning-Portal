@@ -1,102 +1,138 @@
 // components/layout/StudentNav.tsx
-// Student navigation — desktop top bar + mobile bottom bar.
-// Touch targets ≥ 44×44px. Warm amber accent, non-AI palette.
+// Modern, tactile student navigation — desktop top bar + floating mobile dock.
+// Uses usePathname() for instant active-state micro-interactions.
+
+"use client";
 
 import React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Home, BookOpen, Bell, LogOut } from "lucide-react";
 import { logout } from "@/actions/auth";
 
 const NAV_ITEMS = [
-  { href: "/home", label: "Home", icon: Home },
-  { href: "/home/lessons", label: "Lessons", icon: BookOpen },
-  { href: "/home/announcements", label: "Notices", icon: Bell },
+  { href: "/home", label: "Home", icon: Home, exact: true },
+  { href: "/home/lessons", label: "Lessons", icon: BookOpen, exact: false },
+  { href: "/home/announcements", label: "Notices", icon: Bell, exact: false },
 ];
 
 export function StudentNav() {
+  const pathname = usePathname();
+
+  const isItemActive = (href: string, exact: boolean) => {
+    if (exact) {
+      return pathname === href;
+    }
+    return pathname.startsWith(href);
+  };
+
   return (
     <>
       {/* ── Desktop Header ───────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 hidden border-b border-border bg-card/95 backdrop-blur-sm sm:block">
-        <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4 sm:px-6">
+      <header className="sticky top-0 z-40 hidden border-b border-border/80 bg-card/90 backdrop-blur-md sm:block">
+        <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-6">
+          {/* Brand mark */}
           <Link
             href="/home"
-            className="flex items-center gap-2.5 text-foreground"
+            className="flex items-center gap-2.5 transition-transform hover:scale-[1.02]"
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-black text-primary-foreground shadow-sm select-none">
-              E
-            </span>
-            <span className="text-base font-black tracking-tight text-foreground">
-              Edvora
-            </span>
+            <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-black text-primary-foreground shadow-sm">
+              <span>E</span>
+              <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-background bg-emerald-500" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-base font-black tracking-tight text-foreground leading-none">
+                Edvora
+              </span>
+              <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground mt-0.5">
+                Eng Tech Portal
+              </span>
+            </div>
           </Link>
 
-          <nav className="flex items-center gap-0.5" aria-label="Student navigation">
-            {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <Icon className="h-3.5 w-3.5" />
-                <span>{label}</span>
-              </Link>
-            ))}
+          {/* Nav Pills */}
+          <nav className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-border/50" aria-label="Student navigation">
+            {NAV_ITEMS.map(({ href, label, icon: Icon, exact }) => {
+              const active = isItemActive(href, exact);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all duration-200 ${
+                    active
+                      ? "bg-primary text-primary-foreground shadow-xs"
+                      : "text-muted-foreground hover:bg-card hover:text-foreground"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{label}</span>
+                </Link>
+              );
+            })}
           </nav>
 
+          {/* User Sign Out */}
           <form action={logout}>
             <button
               type="submit"
-              className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-border/60 bg-background px-3 text-xs font-semibold text-muted-foreground transition-all hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive active:scale-95"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-3.5 w-3.5" />
               <span>Sign out</span>
             </button>
           </form>
         </div>
       </header>
 
-      {/* ── Mobile Top Bar (Brand + Logout only) ─────────────────── */}
-      <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur-sm sm:hidden">
-        <div className="flex h-13 items-center justify-between px-4">
-          <Link
-            href="/home"
-            className="flex items-center gap-2 text-foreground"
-          >
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-black text-primary-foreground select-none">
-              E
-            </span>
-            <span className="text-sm font-black tracking-tight">Edvora</span>
+      {/* ── Mobile Top Header (Brand & Telemetry Status) ─────────── */}
+      <header className="sticky top-0 z-40 border-b border-border/60 bg-card/90 backdrop-blur-md sm:hidden">
+        <div className="flex h-12 items-center justify-between px-4">
+          <Link href="/home" className="flex items-center gap-2">
+            <div className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-black text-primary-foreground shadow-xs">
+              <span>E</span>
+              <span className="absolute -bottom-0.5 -right-0.5 h-1.5 w-1.5 rounded-full border border-background bg-emerald-500" />
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-sm font-black tracking-tight">Edvora</span>
+              <span className="text-[10px] font-mono text-muted-foreground">STUDENT</span>
+            </div>
           </Link>
 
           <form action={logout}>
             <button
               type="submit"
-              className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border/50 text-muted-foreground hover:text-destructive transition-colors"
               aria-label="Sign out"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-3.5 w-3.5" />
             </button>
           </form>
         </div>
       </header>
 
-      {/* ── Mobile Bottom Navigation Bar (≥ 44px tap targets) ───── */}
+      {/* ── Mobile Floating Modern Dock Navigation ───────────────── */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/97 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm sm:hidden"
+        className="fixed bottom-3 inset-x-4 z-50 mx-auto max-w-sm sm:hidden"
         aria-label="Mobile navigation"
       >
-        <div className="grid h-14 grid-cols-3">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className="flex h-full min-h-[44px] flex-col items-center justify-center gap-0.5 text-[10px] font-semibold text-muted-foreground transition-colors hover:text-primary active:text-primary"
-            >
-              <Icon className="h-5 w-5" />
-              <span>{label}</span>
-            </Link>
-          ))}
+        <div className="flex h-14 items-center justify-around rounded-2xl border border-border/80 bg-card/95 p-1.5 shadow-xl shadow-black/10 backdrop-blur-xl">
+          {NAV_ITEMS.map(({ href, label, icon: Icon, exact }) => {
+            const active = isItemActive(href, exact);
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[11px] font-bold transition-all duration-200 active:scale-95 ${
+                  active
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Icon className={`h-4 w-4 ${active ? "stroke-[2.5]" : "stroke-[1.8]"}`} />
+                <span className="text-[10px] tracking-tight">{label}</span>
+              </Link>
+            );
+          })}
         </div>
       </nav>
     </>

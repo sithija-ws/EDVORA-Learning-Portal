@@ -35,15 +35,15 @@ export function AnnouncementCard({
 
   return (
     <div
-      className={`group relative flex flex-col gap-3 overflow-hidden rounded-xl border p-4 transition-all ${
+      className={`group relative flex flex-col gap-3 overflow-hidden rounded-2xl border p-4 transition-all duration-200 hover:-translate-y-0.5 ${
         isPinned
-          ? "border-primary/40 bg-primary/5 shadow-sm"
-          : "border-border bg-card hover:border-primary/20 hover:shadow-sm"
+          ? "border-primary/40 bg-primary/5 shadow-xs"
+          : "border-border bg-card hover:border-primary/20 hover:shadow-xs"
       }`}
     >
       {/* Pinned accent stripe */}
       {isPinned && (
-        <div className="absolute left-0 top-0 h-full w-1 rounded-l-xl bg-primary" />
+        <div className="absolute left-0 top-0 h-full w-1 rounded-l-2xl bg-primary" />
       )}
 
       {/* Header */}

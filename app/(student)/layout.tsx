@@ -12,7 +12,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       <StudentNav />
-      <main className="mx-auto max-w-3xl pb-20 sm:pb-8">
+      <main className="mx-auto max-w-3xl pb-24 sm:pb-8">
         {children}
       </main>
     </div>
