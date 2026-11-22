@@ -6,8 +6,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Bell, Play, ArrowRight, Video } from "lucide-react";
-import type { Lesson, Batch } from "@/types";
+import { BookOpen, Bell, Play, ArrowRight, Video, Pin } from "lucide-react";
+import type { Lesson, Batch, Announcement } from "@/types";
 
 export const instant = false;
 
@@ -79,6 +79,29 @@ export default async function StudentHomePage() {
 
       recentLessons = lessonsData ?? [];
     }
+  }
+
+  // 5. Fetch recent announcements for student's batches or broadcast
+  let recentAnnouncements: Announcement[] = [];
+
+  if (enrolledBatchIds.length > 0) {
+    const { data: annBatches } = await supabase
+      .from("announcement_batches")
+      .select("announcement_id")
+      .in("batch_id", enrolledBatchIds);
+
+    const scopedAnnIds = annBatches?.map((ab) => ab.announcement_id) ?? [];
+
+    const { data: annData } = await supabase
+      .from("announcements")
+      .select("*")
+      .order("is_pinned", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    const allNotices = annData ?? [];
+    recentAnnouncements = allNotices
+      .filter((a) => a.is_broadcast || scopedAnnIds.includes(a.id))
+      .slice(0, 3);
   }
 
   return (
@@ -191,25 +214,76 @@ export default async function StudentHomePage() {
           )}
         </section>
 
-        {/* Announcements Section (Milestone 4 placeholder) */}
-        <section className="rounded-2xl border bg-card p-5 space-y-3 shadow-xs">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
-              <Bell className="h-4 w-4" />
+        {/* Announcements Section */}
+        <section className="rounded-2xl border bg-card p-5 space-y-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+                <Bell className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-foreground">
+                  Class Notices & Announcements
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Important updates from your instructor
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base font-semibold text-foreground">
-                Class Notices & Announcements
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Important updates from your instructor
-              </p>
-            </div>
+
+            <Link
+              href="/home/announcements"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+            >
+              <span>View all</span>
+              <ArrowRight className="h-3 w-3" />
+            </Link>
           </div>
 
-          <div className="rounded-xl border border-dashed bg-muted/20 p-6 text-center text-xs text-muted-foreground">
-            Announcements and notifications will be enabled in Milestone 4.
-          </div>
+          {recentAnnouncements.length === 0 ? (
+            <div className="rounded-xl border border-dashed bg-muted/20 p-8 text-center text-xs text-muted-foreground">
+              <p className="font-medium text-foreground">No notices posted yet</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Check back regularly for holiday updates, schedule adjustments, and homework notices.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recentAnnouncements.map((ann) => (
+                <div
+                  key={ann.id}
+                  className={`rounded-xl border p-4 space-y-2 transition-all ${
+                    ann.is_pinned
+                      ? "border-amber-300 bg-amber-50/30"
+                      : "bg-muted/10 hover:bg-muted/30"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 font-semibold text-sm text-foreground">
+                      {ann.is_pinned && (
+                        <span className="flex items-center gap-1 text-[10px] text-amber-700 bg-amber-100 rounded px-1.5 py-0.5 font-medium">
+                          <Pin className="h-3 w-3 fill-amber-700 text-amber-700" />
+                          Pinned
+                        </span>
+                      )}
+                      <span>{ann.title}</span>
+                    </div>
+
+                    <span className="text-[11px] text-muted-foreground shrink-0">
+                      {new Date(ann.created_at).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                    {ann.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </div>

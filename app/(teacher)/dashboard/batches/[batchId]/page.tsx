@@ -8,8 +8,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StudentTable } from "@/components/students/StudentTable";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Users, BookOpen, Bell, Archive, Play } from "lucide-react";
-import type { Profile, Lesson } from "@/types";
+import { Plus, Edit, Users, BookOpen, Bell, Archive, Play, Pin } from "lucide-react";
+import type { Profile, Lesson, Announcement } from "@/types";
 
 export const instant = false;
 
@@ -84,6 +84,25 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
 
     lessons = lessonsData ?? [];
   }
+
+  // 4. Fetch announcements relevant to this batch
+  const { data: batchAnnData } = await supabase
+    .from("announcement_batches")
+    .select("announcement_id")
+    .eq("batch_id", batchId);
+
+  const scopedAnnIds = batchAnnData?.map((ab) => ab.announcement_id) ?? [];
+
+  const { data: announcementsData } = await supabase
+    .from("announcements")
+    .select("*")
+    .order("is_pinned", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  const allAnnouncements: Announcement[] = announcementsData ?? [];
+  const announcements = allAnnouncements.filter(
+    (a) => a.is_broadcast || scopedAnnIds.includes(a.id)
+  );
 
   return (
     <div>
@@ -217,18 +236,78 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
 
           {/* Announcements Section */}
           <section className="rounded-xl border bg-card p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <Bell className="h-5 w-5 text-amber-500" />
-              <h3 className="text-base font-semibold text-foreground">
-                Announcements
-              </h3>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bell className="h-5 w-5 text-amber-500" />
+                <h3 className="text-base font-semibold text-foreground">
+                  Announcements ({announcements.length})
+                </h3>
+              </div>
+              <Link
+                href={`/dashboard/announcements/new?batchId=${batch.id}`}
+                className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Post Notice</span>
+              </Link>
             </div>
             <p className="text-xs text-muted-foreground">
-              Publish text notices specifically to this batch.
+              Notices and reminders visible to this batch.
             </p>
-            <div className="rounded-lg bg-muted/40 p-4 text-center text-xs text-muted-foreground">
-              Announcements will be implemented in Milestone 4.
-            </div>
+
+            {announcements.length === 0 ? (
+              <div className="rounded-lg bg-muted/40 p-5 text-center text-xs text-muted-foreground">
+                <p>No notices posted for this batch yet.</p>
+                <Link
+                  href={`/dashboard/announcements/new?batchId=${batch.id}`}
+                  className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span>Post first announcement</span>
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {announcements.slice(0, 4).map((a) => (
+                  <div
+                    key={a.id}
+                    className="rounded-lg border p-3 bg-muted/20 space-y-1.5 text-xs"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 font-semibold text-foreground truncate">
+                        {a.is_pinned && (
+                          <Pin className="h-3 w-3 fill-amber-600 text-amber-600 shrink-0" />
+                        )}
+                        {a.is_broadcast && (
+                          <Badge className="bg-indigo-600 text-white text-[9px] px-1 py-0">
+                            Broadcast
+                          </Badge>
+                        )}
+                        <span className="truncate">{a.title}</span>
+                      </div>
+                      <Link
+                        href={`/dashboard/announcements/${a.id}/edit`}
+                        className="text-[11px] text-muted-foreground hover:text-foreground shrink-0"
+                      >
+                        Edit
+                      </Link>
+                    </div>
+                    <p className="line-clamp-2 text-muted-foreground text-[11px]">
+                      {a.body}
+                    </p>
+                  </div>
+                ))}
+
+                {announcements.length > 4 && (
+                  <Link
+                    href={`/dashboard/announcements?batchId=${batch.id}`}
+                    className="block text-center text-xs font-medium text-primary hover:underline pt-1"
+                  >
+                    View all {announcements.length} announcements →
+                  </Link>
+                )}
+              </div>
+            )}
           </section>
         </div>
       </div>
