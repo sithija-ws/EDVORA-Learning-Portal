@@ -93,7 +93,7 @@ export function StudentTable({ batchId, students }: StudentTableProps) {
 
                 <td className="px-4 py-3">
                   {student.is_active ? (
-                    <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[11px]">
+                    <Badge variant="outline" className="bg-primary/8 text-primary border-primary/30 text-[11px]">
                       Active
                     </Badge>
                   ) : (
@@ -115,9 +115,9 @@ export function StudentTable({ batchId, students }: StudentTableProps) {
                       title={student.is_active ? "Deactivate student" : "Activate student"}
                     >
                       {student.is_active ? (
-                        <UserX className="h-4 w-4 text-amber-600" />
+                        <UserX className="h-4 w-4 text-muted-foreground" />
                       ) : (
-                        <UserCheck className="h-4 w-4 text-emerald-600" />
+                        <UserCheck className="h-4 w-4 text-primary" />
                       )}
                       <span className="sr-only">
                         {student.is_active ? "Deactivate" : "Activate"}

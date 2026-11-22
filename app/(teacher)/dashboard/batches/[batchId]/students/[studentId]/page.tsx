@@ -71,7 +71,7 @@ export default async function StudentDetailPage({
         backHref={`/dashboard/batches/${batchId}`}
         badge={
           student.is_active ? (
-            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
+            <Badge variant="outline" className="bg-primary/8 text-primary border-primary/30 text-xs">
               Active
             </Badge>
           ) : (

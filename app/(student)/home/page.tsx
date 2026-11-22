@@ -1,5 +1,6 @@
 // app/(student)/home/page.tsx
-// Student portal home — enrolled batch header + recent lessons feed.
+// Student portal home — enrolled batch header + recent lessons and notices.
+// Mobile-first. Warm editorial design. pb-20 for bottom nav clearance.
 
 import React from "react";
 import Link from "next/link";
@@ -12,33 +13,28 @@ import type { Lesson, Batch, Announcement } from "@/types";
 export const instant = false;
 
 export const metadata = {
-  title: "Student Portal — Edvora",
+  title: "Home – Edvora",
 };
 
 export default async function StudentHomePage() {
   const supabase = await createServerClient();
 
-  // 1. Authenticate user
+  // 1. Authenticate
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
-  if (!user) {
-    redirect("/login");
-  }
-
-  // 2. Fetch profile to ensure active student
+  // 2. Profile
   const { data: profile } = await supabase
     .from("profiles")
     .select("full_name, is_active, role")
     .eq("id", user.id)
     .single();
 
-  if (!profile || !profile.is_active) {
-    redirect("/disabled");
-  }
+  if (!profile || !profile.is_active) redirect("/disabled");
 
-  // 3. Fetch student's enrolled batches
+  // 3. Enrolled batches
   const { data: enrollments } = await supabase
     .from("enrollments")
     .select("batch_id")
@@ -53,20 +49,20 @@ export default async function StudentHomePage() {
       .select("*")
       .in("id", enrolledBatchIds)
       .order("year", { ascending: false });
-
     batches = batchesData ?? [];
   }
 
-  // 4. Fetch recent lessons assigned to student's batches
+  // 4. Recent lessons
   let recentLessons: Lesson[] = [];
-
   if (enrolledBatchIds.length > 0) {
     const { data: lessonBatches } = await supabase
       .from("lesson_batches")
       .select("lesson_id")
       .in("batch_id", enrolledBatchIds);
 
-    const lessonIds = Array.from(new Set(lessonBatches?.map((lb) => lb.lesson_id) ?? []));
+    const lessonIds = Array.from(
+      new Set(lessonBatches?.map((lb) => lb.lesson_id) ?? [])
+    );
 
     if (lessonIds.length > 0) {
       const { data: lessonsData } = await supabase
@@ -76,14 +72,12 @@ export default async function StudentHomePage() {
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: false })
         .limit(3);
-
       recentLessons = lessonsData ?? [];
     }
   }
 
-  // 5. Fetch recent announcements for student's batches or broadcast
+  // 5. Recent announcements
   let recentAnnouncements: Announcement[] = [];
-
   if (enrolledBatchIds.length > 0) {
     const { data: annBatches } = await supabase
       .from("announcement_batches")
@@ -104,188 +98,196 @@ export default async function StudentHomePage() {
       .slice(0, 3);
   }
 
+  const firstName = profile.full_name.split(" ")[0];
+
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      {/* Welcome & Batch Header */}
-      <div className="space-y-2">
+      {/* ── Welcome Hero ───────────────────────────────────────────── */}
+      <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/8 via-background to-background p-5 space-y-3">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Enrolled In:
-          </span>
           {batches.length > 0 ? (
             batches.map((b) => (
-              <Badge key={b.id} variant="secondary" className="text-xs">
-                {b.name} ({b.year} A/L)
+              <Badge
+                key={b.id}
+                variant="outline"
+                className="border-primary/30 text-primary text-[10px] font-bold uppercase tracking-wide"
+              >
+                {b.name} · {b.year} A/L
               </Badge>
             ))
           ) : (
-            <Badge variant="outline" className="text-xs text-muted-foreground">
-              No active batches
+            <Badge variant="outline" className="text-[10px] text-muted-foreground">
+              No active batch
             </Badge>
           )}
         </div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Welcome, {profile.full_name}
-        </h1>
-        <p className="text-xs text-muted-foreground">
-          Engineering Technology Tuition Portal — Access your lessons and study materials below.
-        </p>
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-foreground">
+            Hello, {firstName} 👋
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+            Engineering Technology Tuition · Access your lessons and study
+            materials below.
+          </p>
+        </div>
+
+        {/* Quick nav pills */}
+        <div className="flex gap-2 pt-1">
+          <Link
+            href="/home/lessons"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-95"
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            Lessons
+          </Link>
+          <Link
+            href="/home/announcements"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-bold text-foreground shadow-sm transition-all hover:border-primary/40 hover:bg-primary/5 active:scale-95"
+          >
+            <Bell className="h-3.5 w-3.5" />
+            Notices
+          </Link>
+        </div>
       </div>
 
-      {/* Quick Access Grid */}
-      <div className="grid gap-6">
-        {/* Recent Lessons Section */}
-        <section className="rounded-2xl border bg-card p-5 space-y-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                <BookOpen className="h-4 w-4" />
-              </div>
-              <div>
-                <h2 className="text-base font-semibold text-foreground">
-                  Recent Lessons
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  Latest video lectures for your batches
-                </p>
-              </div>
+      {/* ── Recent Lessons ─────────────────────────────────────────── */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <BookOpen className="h-4 w-4" />
             </div>
-
-            <Link
-              href="/home/lessons"
-              className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-            >
-              <span>View all</span>
-              <ArrowRight className="h-3 w-3" />
-            </Link>
+            <h2 className="text-sm font-black tracking-tight text-foreground">
+              Recent Lessons
+            </h2>
           </div>
+          <Link
+            href="/home/lessons"
+            className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"
+          >
+            All <ArrowRight className="h-3 w-3" />
+          </Link>
+        </div>
 
-          {recentLessons.length === 0 ? (
-            <div className="rounded-xl border border-dashed bg-muted/20 p-8 text-center text-muted-foreground">
-              <Video className="h-6 w-6 mx-auto mb-2 text-muted-foreground/60" />
-              <p className="text-xs font-medium text-foreground">
-                No lessons available yet
-              </p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                New video units will appear here as soon as your teacher publishes them.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2.5">
-              {recentLessons.map((lesson) => (
-                <Link
-                  key={lesson.id}
-                  href={`/home/lessons/${lesson.id}`}
-                  className="group flex items-center justify-between gap-3 rounded-xl border p-3 hover:bg-muted/50 hover:border-primary/40 transition-all"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="relative h-12 w-20 shrink-0 overflow-hidden rounded-lg bg-black">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={
-                          lesson.thumbnail_url ||
-                          `https://img.youtube.com/vi/${lesson.youtube_id}/hqdefault.jpg`
-                        }
-                        alt={lesson.title}
-                        className="h-full w-full object-cover"
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/10 transition-colors">
-                        <Play className="h-4 w-4 fill-white text-white ml-0.5" />
-                      </div>
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="truncate text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
-                        {lesson.title}
-                      </h3>
-                      {lesson.description && (
-                        <p className="truncate text-[11px] text-muted-foreground mt-0.5">
-                          {lesson.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <span className="shrink-0 text-xs font-semibold text-primary flex items-center gap-1">
-                    Watch <Play className="h-3 w-3 fill-current" />
-                  </span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Announcements Section */}
-        <section className="rounded-2xl border bg-card p-5 space-y-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
-                <Bell className="h-4 w-4" />
-              </div>
-              <div>
-                <h2 className="text-base font-semibold text-foreground">
-                  Class Notices & Announcements
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  Important updates from your instructor
-                </p>
-              </div>
-            </div>
-
-            <Link
-              href="/home/announcements"
-              className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-            >
-              <span>View all</span>
-              <ArrowRight className="h-3 w-3" />
-            </Link>
+        {recentLessons.length === 0 ? (
+          <div className="rounded-xl border border-dashed bg-muted/20 p-8 text-center">
+            <Video className="mx-auto h-7 w-7 text-muted-foreground/40 mb-2" />
+            <p className="text-xs font-semibold text-foreground">No lessons yet</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              New video units will appear here once your teacher publishes them.
+            </p>
           </div>
-
-          {recentAnnouncements.length === 0 ? (
-            <div className="rounded-xl border border-dashed bg-muted/20 p-8 text-center text-xs text-muted-foreground">
-              <p className="font-medium text-foreground">No notices posted yet</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Check back regularly for holiday updates, schedule adjustments, and homework notices.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {recentAnnouncements.map((ann) => (
-                <div
-                  key={ann.id}
-                  className={`rounded-xl border p-4 space-y-2 transition-all ${
-                    ann.is_pinned
-                      ? "border-amber-300 bg-amber-50/30"
-                      : "bg-muted/10 hover:bg-muted/30"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 font-semibold text-sm text-foreground">
-                      {ann.is_pinned && (
-                        <span className="flex items-center gap-1 text-[10px] text-amber-700 bg-amber-100 rounded px-1.5 py-0.5 font-medium">
-                          <Pin className="h-3 w-3 fill-amber-700 text-amber-700" />
-                          Pinned
-                        </span>
-                      )}
-                      <span>{ann.title}</span>
-                    </div>
-
-                    <span className="text-[11px] text-muted-foreground shrink-0">
-                      {new Date(ann.created_at).toLocaleDateString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </span>
+        ) : (
+          <div className="space-y-2">
+            {recentLessons.map((lesson) => (
+              <Link
+                key={lesson.id}
+                href={`/home/lessons/${lesson.id}`}
+                className="group flex items-center gap-3 rounded-xl border border-border bg-card p-3 transition-all hover:border-primary/40 hover:shadow-sm active:scale-[0.99]"
+              >
+                {/* Thumbnail */}
+                <div className="relative h-14 w-24 shrink-0 overflow-hidden rounded-lg bg-zinc-900">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={
+                      lesson.thumbnail_url ||
+                      `https://img.youtube.com/vi/${lesson.youtube_id}/hqdefault.jpg`
+                    }
+                    alt={lesson.title}
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/35 group-hover:bg-black/15 transition-colors">
+                    <Play className="h-4 w-4 fill-white text-white ml-0.5" />
                   </div>
-
-                  <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                    {ann.body}
-                  </p>
                 </div>
-              ))}
+
+                {/* Info */}
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-xs font-black text-foreground group-hover:text-primary transition-colors leading-tight">
+                    {lesson.title}
+                  </h3>
+                  {lesson.description && (
+                    <p className="truncate text-[11px] text-muted-foreground mt-0.5">
+                      {lesson.description}
+                    </p>
+                  )}
+                </div>
+
+                <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── Recent Announcements ──────────────────────────────────── */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Bell className="h-4 w-4" />
             </div>
-          )}
-        </section>
-      </div>
+            <h2 className="text-sm font-black tracking-tight text-foreground">
+              Class Notices
+            </h2>
+          </div>
+          <Link
+            href="/home/announcements"
+            className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"
+          >
+            All <ArrowRight className="h-3 w-3" />
+          </Link>
+        </div>
+
+        {recentAnnouncements.length === 0 ? (
+          <div className="rounded-xl border border-dashed bg-muted/20 p-8 text-center">
+            <Bell className="mx-auto h-7 w-7 text-muted-foreground/40 mb-2" />
+            <p className="text-xs font-semibold text-foreground">No notices yet</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Check back for holiday updates, schedule changes, and homework.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {recentAnnouncements.map((ann) => (
+              <div
+                key={ann.id}
+                className={`relative overflow-hidden rounded-xl border p-4 space-y-2 ${
+                  ann.is_pinned
+                    ? "border-primary/30 bg-primary/5"
+                    : "border-border bg-card"
+                }`}
+              >
+                {ann.is_pinned && (
+                  <div className="absolute left-0 top-0 h-full w-1 bg-primary rounded-l-xl" />
+                )}
+                <div className="flex items-start justify-between gap-2 pl-1">
+                  <div className="flex flex-col gap-1 min-w-0">
+                    {ann.is_pinned && (
+                      <span className="inline-flex w-fit items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+                        <Pin className="h-2.5 w-2.5 fill-current" />
+                        Pinned
+                      </span>
+                    )}
+                    <h3 className="text-xs font-black text-foreground leading-snug">
+                      {ann.title}
+                    </h3>
+                  </div>
+                  <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
+                    {new Date(ann.created_at).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap pl-1 line-clamp-3">
+                  {ann.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

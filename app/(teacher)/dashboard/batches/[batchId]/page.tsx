@@ -172,7 +172,7 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
           <section className="rounded-xl border bg-card p-5 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-indigo-500" />
+                <BookOpen className="h-5 w-5 text-primary" />
                 <h3 className="text-base font-semibold text-foreground">
                   Lessons ({lessons.length})
                 </h3>
@@ -209,7 +209,7 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
                     className="flex items-center justify-between rounded-lg border p-2.5 hover:bg-muted/50 transition-colors text-xs"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-indigo-50 text-indigo-600">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                         <Play className="h-3.5 w-3.5 fill-current" />
                       </div>
                       <span className="truncate font-medium text-foreground">
@@ -238,7 +238,7 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
           <section className="rounded-xl border bg-card p-5 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Bell className="h-5 w-5 text-amber-500" />
+                <Bell className="h-5 w-5 text-primary" />
                 <h3 className="text-base font-semibold text-foreground">
                   Announcements ({announcements.length})
                 </h3>
@@ -276,10 +276,10 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 font-semibold text-foreground truncate">
                         {a.is_pinned && (
-                          <Pin className="h-3 w-3 fill-amber-600 text-amber-600 shrink-0" />
+                          <Pin className="h-3 w-3 fill-primary text-primary shrink-0" />
                         )}
                         {a.is_broadcast && (
-                          <Badge className="bg-indigo-600 text-white text-[9px] px-1 py-0">
+                          <Badge className="bg-primary text-primary-foreground text-[9px] px-1 py-0">
                             Broadcast
                           </Badge>
                         )}

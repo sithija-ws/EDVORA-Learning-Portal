@@ -1,5 +1,5 @@
 // components/layout/PageHeader.tsx
-// Lightweight, responsive page header component.
+// Page header with strong typographic hierarchy and optional back navigation.
 
 import React from "react";
 import Link from "next/link";
@@ -26,23 +26,23 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-2 border-b bg-card/50 px-4 py-4 backdrop-blur-xs sm:px-6 sm:py-5",
+        "flex flex-col gap-2 border-b border-border bg-card px-4 py-5 sm:px-6 sm:py-6",
         className
       )}
     >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           {backHref && (
             <Link
               href={backHref}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
               aria-label="Go back"
             >
               <ChevronLeft className="h-5 w-5" />
             </Link>
           )}
-          <div className="flex items-center gap-2 truncate">
-            <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl truncate">
+          <div className="flex items-center gap-2.5 truncate">
+            <h1 className="text-xl font-black tracking-tight text-foreground sm:text-2xl truncate">
               {title}
             </h1>
             {badge && <div className="shrink-0">{badge}</div>}
@@ -53,7 +53,7 @@ export function PageHeader({
       </div>
 
       {description && (
-        <p className="text-sm text-muted-foreground leading-relaxed">
+        <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
           {description}
         </p>
       )}

@@ -129,7 +129,7 @@ export function LessonForm({
           />
           <div className="absolute right-3 top-2.5 text-muted-foreground">
             {previewId ? (
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+              <CheckCircle2 className="h-5 w-5 text-primary" />
             ) : (
               <Video className="h-5 w-5" />
             )}
@@ -206,7 +206,7 @@ export function LessonForm({
         </div>
 
         {batches.length === 0 ? (
-          <p className="text-xs text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">
+          <p className="text-xs text-primary bg-primary/8 p-3 rounded-lg border border-primary/20">
             No batches exist yet. Create a batch before publishing lessons.
           </p>
         ) : (
@@ -235,7 +235,7 @@ export function LessonForm({
                       ({b.year} A/L)
                     </span>
                     {b.is_archived && (
-                      <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
+                      <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                         Archived
                       </span>
                     )}

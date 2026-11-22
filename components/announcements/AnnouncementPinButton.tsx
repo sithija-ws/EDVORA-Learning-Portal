@@ -42,7 +42,7 @@ export function AnnouncementPinButton({
       title={isPinned ? "Unpin announcement" : "Pin announcement to top"}
       className={`h-8 w-8 p-0 transition-colors ${
         isPinned
-          ? "text-amber-600 hover:text-amber-700 bg-amber-50"
+          ? "text-primary hover:text-primary/80 bg-primary/10"
           : "text-muted-foreground hover:text-foreground"
       }`}
     >

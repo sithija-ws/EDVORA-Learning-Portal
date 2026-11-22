@@ -1,108 +1,110 @@
 // components/announcements/AnnouncementCard.tsx
-// Responsive card component for text notices in teacher and student views.
+// Notice card — editorial style with pinned state highlighting.
 
 import React from "react";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
+import { Pin, Edit, Radio } from "lucide-react";
 import { AnnouncementDeleteButton } from "./AnnouncementDeleteButton";
 import { AnnouncementPinButton } from "./AnnouncementPinButton";
-import { Pin, Radio, Edit, Calendar } from "lucide-react";
 import type { Announcement, Batch } from "@/types";
 
 interface AnnouncementCardProps {
-  announcement: Announcement;
-  batches?: Batch[];
+  announcement: Announcement & { batches?: Batch[] };
   role: "teacher" | "student";
+  batches?: Batch[];
   showActions?: boolean;
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 export function AnnouncementCard({
   announcement,
-  batches = [],
   role,
+  batches: batchesProp,
   showActions = true,
 }: AnnouncementCardProps) {
   const isPinned = announcement.is_pinned;
-  const isBroadcast = announcement.is_broadcast;
+  // Support both embedded `announcement.batches` and separately passed `batches` prop
+  const displayBatches = batchesProp ?? announcement.batches ?? [];
 
   return (
-    <article
-      className={`relative overflow-hidden rounded-xl border p-5 shadow-xs transition-all ${
+    <div
+      className={`group relative flex flex-col gap-3 overflow-hidden rounded-xl border p-4 transition-all ${
         isPinned
-          ? "border-amber-400/80 bg-gradient-to-b from-amber-50/40 to-background shadow-xs"
-          : "bg-card text-card-foreground hover:border-primary/30"
+          ? "border-primary/40 bg-primary/5 shadow-sm"
+          : "border-border bg-card hover:border-primary/20 hover:shadow-sm"
       }`}
     >
-      {/* Top Header: Badges & Date */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border/40">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {/* Pinned Tag */}
-          {isPinned && (
-            <Badge
-              variant="outline"
-              className="border-amber-400 bg-amber-100 text-amber-900 text-[10px] font-semibold gap-1 px-2"
+      {/* Pinned accent stripe */}
+      {isPinned && (
+        <div className="absolute left-0 top-0 h-full w-1 rounded-l-xl bg-primary" />
+      )}
+
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2 pl-1">
+        <div className="flex flex-col gap-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            {isPinned && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+                <Pin className="h-3 w-3 fill-current" />
+                Pinned
+              </span>
+            )}
+            {announcement.is_broadcast && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <Radio className="h-3 w-3" />
+                All Batches
+              </span>
+            )}
+          </div>
+          <h3 className="text-sm font-black tracking-tight text-foreground leading-snug">
+            {announcement.title}
+          </h3>
+        </div>
+
+        <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
+          {formatDate(announcement.created_at)}
+        </span>
+      </div>
+
+      {/* Body */}
+      <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap pl-1 line-clamp-4">
+        {announcement.body}
+      </p>
+
+      {/* Batch tags */}
+      {displayBatches.length > 0 && (
+        <div className="flex flex-wrap gap-1 pl-1">
+          {displayBatches.map((b) => (
+            <span
+              key={b.id}
+              className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
             >
-              <Pin className="h-3 w-3 fill-amber-700 text-amber-700" />
-              <span>Pinned</span>
-            </Badge>
-          )}
-
-          {/* Broadcast Tag */}
-          {isBroadcast ? (
-            <Badge className="bg-indigo-600 text-white hover:bg-indigo-700 text-[10px] gap-1 px-2 font-medium">
-              <Radio className="h-3 w-3" />
-              <span>All Batches</span>
-            </Badge>
-          ) : (
-            batches.map((b) => (
-              <Badge
-                key={b.id}
-                variant="secondary"
-                className="text-[10px] px-2 py-0.5 font-normal"
-              >
-                {b.name}
-              </Badge>
-            ))
-          )}
+              {b.name}
+            </span>
+          ))}
         </div>
+      )}
 
-        {/* Date Published */}
-        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-          <Calendar className="h-3.5 w-3.5" />
-          <time dateTime={announcement.created_at}>
-            {new Date(announcement.created_at).toLocaleDateString(undefined, {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            })}
-          </time>
-        </div>
-      </div>
-
-      {/* Title & Body */}
-      <div className="pt-3 space-y-2">
-        <h3 className="text-base font-bold tracking-tight text-foreground">
-          {announcement.title}
-        </h3>
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-          {announcement.body}
-        </p>
-      </div>
-
-      {/* Teacher Actions Footer */}
+      {/* Teacher actions */}
       {role === "teacher" && showActions && (
-        <div className="mt-4 pt-3 flex items-center justify-end gap-1 border-t border-border/40">
+        <div className="flex items-center gap-1 border-t border-border pt-3 pl-1">
           <AnnouncementPinButton
             announcementId={announcement.id}
             isPinned={isPinned}
           />
           <Link
             href={`/dashboard/announcements/${announcement.id}/edit`}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            title="Edit Announcement"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <Edit className="h-4 w-4" />
-            <span className="sr-only">Edit</span>
+            <Edit className="h-3.5 w-3.5" />
+            Edit
           </Link>
           <AnnouncementDeleteButton
             announcementId={announcement.id}
@@ -110,6 +112,6 @@ export function AnnouncementCard({
           />
         </div>
       )}
-    </article>
+    </div>
   );
 }

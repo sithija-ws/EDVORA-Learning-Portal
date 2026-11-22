@@ -1,5 +1,5 @@
 // components/batches/BatchCard.tsx
-// Summary card for a batch shown on the teacher dashboard and batches list.
+// Summary card for a batch — editorial card style with accent stripe.
 
 import React from "react";
 import Link from "next/link";
@@ -13,37 +13,47 @@ interface BatchCardProps {
 
 export function BatchCard({ batch }: BatchCardProps) {
   return (
-    <div className="group relative flex flex-col justify-between rounded-xl border bg-card p-5 shadow-xs transition-all hover:border-primary/50 hover:shadow-md">
-      <div>
+    <div className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-all hover:border-primary/40 hover:shadow-md">
+      {/* Accent stripe top */}
+      <div
+        className={`h-1 w-full ${batch.is_archived ? "bg-muted-foreground/30" : "bg-primary"}`}
+      />
+
+      <div className="p-5">
+        {/* Header row */}
         <div className="flex items-start justify-between gap-2">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold tracking-tight text-foreground">
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-base font-black tracking-tight text-foreground leading-tight">
                 {batch.name}
               </h2>
               {batch.is_archived && (
-                <Badge variant="outline" className="text-muted-foreground gap-1 text-[11px]">
+                <Badge
+                  variant="outline"
+                  className="gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                >
                   <Archive className="h-3 w-3" />
                   Archived
                 </Badge>
               )}
             </div>
-            <p className="text-xs font-medium text-muted-foreground">
-              A/L Batch {batch.year}
+            <p className="text-xs font-semibold text-muted-foreground">
+              A/L Batch · {batch.year}
             </p>
           </div>
         </div>
 
         {batch.description && (
-          <p className="mt-3 text-xs text-muted-foreground line-clamp-2">
+          <p className="mt-3 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
             {batch.description}
           </p>
         )}
       </div>
 
-      <div className="mt-5 flex items-center justify-between border-t pt-4">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Users className="h-4 w-4" />
+      {/* Footer */}
+      <div className="flex items-center justify-between border-t border-border bg-muted/20 px-5 py-3">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <Users className="h-3.5 w-3.5" />
           <span>
             {batch.student_count !== undefined
               ? `${batch.student_count} student${batch.student_count === 1 ? "" : "s"}`
@@ -53,7 +63,7 @@ export function BatchCard({ batch }: BatchCardProps) {
 
         <Link
           href={`/dashboard/batches/${batch.id}`}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-primary group-hover:translate-x-0.5 transition-transform"
+          className="inline-flex items-center gap-1 text-xs font-bold text-primary transition-transform group-hover:translate-x-0.5"
         >
           <span>Manage</span>
           <ChevronRight className="h-4 w-4" />

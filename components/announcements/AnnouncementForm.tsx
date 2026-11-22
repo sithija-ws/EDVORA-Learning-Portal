@@ -125,11 +125,11 @@ export function AnnouncementForm({
             checked={isBroadcast}
             onChange={(e) => setIsBroadcast(e.target.checked)}
             disabled={isPending}
-            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600"
+            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
           />
           <div>
             <div className="flex items-center gap-1.5 font-medium text-sm text-foreground">
-              <Radio className="h-4 w-4 text-indigo-600" />
+              <Radio className="h-4 w-4 text-primary" />
               <span>Broadcast to all batches</span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -167,7 +167,7 @@ export function AnnouncementForm({
             </div>
 
             {batches.length === 0 ? (
-              <p className="text-xs text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">
+              <p className="text-xs text-primary bg-primary/8 p-3 rounded-lg border border-primary/20">
                 No batches created yet.
               </p>
             ) : (
@@ -207,11 +207,11 @@ export function AnnouncementForm({
             name="is_pinned"
             defaultChecked={announcement?.is_pinned ?? false}
             disabled={isPending}
-            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-600"
+            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
           />
           <div>
             <div className="flex items-center gap-1.5 font-medium text-sm text-foreground">
-              <Pin className="h-4 w-4 text-amber-600" />
+              <Pin className="h-4 w-4 text-primary" />
               <span>Pin to top</span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
