@@ -7,12 +7,13 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, BookOpen, Bell, LogOut } from "lucide-react";
+import { Home, BookOpen, Bell, LogOut, FileText } from "lucide-react";
 import { logout } from "@/actions/auth";
 
 const NAV_ITEMS = [
   { href: "/home", label: "Home", icon: Home, exact: true },
   { href: "/home/lessons", label: "Lessons", icon: BookOpen, exact: false },
+  { href: "/home/notes", label: "Notes", icon: FileText, exact: false },
   { href: "/home/announcements", label: "Notices", icon: Bell, exact: false },
 ];
 

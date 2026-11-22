@@ -93,6 +93,24 @@ export interface AnnouncementWithBatches extends Announcement {
   announcement_batches: Array<{ batch_id: string; batch?: Batch }>;
 }
 
+// ─── Note (PDF study materials) ───────────────────────────────────────────────
+
+export interface Note {
+  id: string;
+  title: string;
+  description: string | null;
+  file_url: string;
+  file_name: string;
+  file_size: number | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NoteWithBatches extends Note {
+  note_batches: Array<{ batch_id: string; batch?: Batch }>;
+}
+
 // ─── Form / Action utilities ──────────────────────────────────────────────────
 
 /**

@@ -85,3 +85,18 @@ export const LESSON_DESCRIPTION_MAX_LENGTH = 2000 as const;
  * Maximum length for batch names.
  */
 export const BATCH_NAME_MAX_LENGTH = 100 as const;
+
+/**
+ * Maximum length for note titles.
+ */
+export const NOTE_TITLE_MAX_LENGTH = 200 as const;
+
+/**
+ * Maximum length for note descriptions.
+ */
+export const NOTE_DESCRIPTION_MAX_LENGTH = 2000 as const;
+
+/**
+ * Maximum PDF upload size in bytes (50 MB).
+ */
+export const MAX_PDF_FILE_SIZE = 52428800; // 50 * 1024 * 1024 bytes

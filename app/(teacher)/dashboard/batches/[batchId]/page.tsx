@@ -8,8 +8,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StudentTable } from "@/components/students/StudentTable";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Users, BookOpen, Bell, Archive, Play, Pin } from "lucide-react";
-import type { Profile, Lesson, Announcement } from "@/types";
+import { Plus, Edit, Users, BookOpen, Bell, Archive, Play, Pin, FileText } from "lucide-react";
+import type { Profile, Lesson, Announcement, Note } from "@/types";
 
 export const instant = false;
 
@@ -104,6 +104,25 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
     (a) => a.is_broadcast || scopedAnnIds.includes(a.id)
   );
 
+  // 5. Fetch notes assigned to this batch
+  const { data: batchNoteData } = await supabase
+    .from("note_batches")
+    .select("note_id")
+    .eq("batch_id", batchId);
+
+  const noteIds = batchNoteData?.map((nb) => nb.note_id) ?? [];
+  let notes: Note[] = [];
+
+  if (noteIds.length > 0) {
+    const { data: notesData } = await supabase
+      .from("notes")
+      .select("*")
+      .in("id", noteIds)
+      .order("created_at", { ascending: false });
+
+    notes = notesData ?? [];
+  }
+
   return (
     <div>
       <PageHeader
@@ -166,14 +185,14 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
           <StudentTable batchId={batch.id} students={students} />
         </section>
 
-        {/* Milestone 3 & 4 Sections */}
-        <div className="grid gap-6 sm:grid-cols-2 pt-4 border-t">
+        {/* Milestone 3, 4 & 5 Sections */}
+        <div className="grid gap-6 lg:grid-cols-3 pt-4 border-t border-border">
           {/* Lessons Section */}
-          <section className="rounded-xl border bg-card p-5 space-y-3">
+          <section className="rounded-2xl border border-border bg-card p-5 space-y-3 shadow-xs">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <BookOpen className="h-5 w-5 text-primary" />
-                <h3 className="text-base font-semibold text-foreground">
+                <h3 className="text-base font-bold text-foreground">
                   Lessons ({lessons.length})
                 </h3>
               </div>
@@ -190,7 +209,7 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
             </p>
 
             {lessons.length === 0 ? (
-              <div className="rounded-lg bg-muted/40 p-5 text-center text-xs text-muted-foreground">
+              <div className="rounded-xl bg-muted/40 p-5 text-center text-xs text-muted-foreground">
                 <p>No lessons assigned to this batch yet.</p>
                 <Link
                   href={`/dashboard/lessons/new?batchId=${batch.id}`}
@@ -206,7 +225,7 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
                   <Link
                     key={l.id}
                     href={`/dashboard/lessons/${l.id}`}
-                    className="flex items-center justify-between rounded-lg border p-2.5 hover:bg-muted/50 transition-colors text-xs"
+                    className="flex items-center justify-between rounded-xl border border-border/80 p-2.5 hover:bg-muted/50 transition-colors text-xs"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
@@ -216,7 +235,7 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
                         {l.title}
                       </span>
                     </div>
-                    <span className="shrink-0 text-[11px] text-muted-foreground ml-2">
+                    <span className="shrink-0 text-[11px] font-mono text-muted-foreground ml-2">
                       #{l.sort_order}
                     </span>
                   </Link>
@@ -234,8 +253,74 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
             )}
           </section>
 
+          {/* Notes (PDF) Section */}
+          <section className="rounded-2xl border border-border bg-card p-5 space-y-3 shadow-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                <h3 className="text-base font-bold text-foreground">
+                  PDF Notes ({notes.length})
+                </h3>
+              </div>
+              <Link
+                href={`/dashboard/notes/new?batchId=${batch.id}`}
+                className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Upload Note</span>
+              </Link>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Study notes & handouts for {batch.name}.
+            </p>
+
+            {notes.length === 0 ? (
+              <div className="rounded-xl bg-muted/40 p-5 text-center text-xs text-muted-foreground">
+                <p>No study notes uploaded for this batch yet.</p>
+                <Link
+                  href={`/dashboard/notes/new?batchId=${batch.id}`}
+                  className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span>Upload first note</span>
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {notes.slice(0, 5).map((n) => (
+                  <Link
+                    key={n.id}
+                    href={`/dashboard/notes/${n.id}`}
+                    className="flex items-center justify-between rounded-xl border border-border/80 p-2.5 hover:bg-muted/50 transition-colors text-xs"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                        <FileText className="h-3.5 w-3.5" />
+                      </div>
+                      <span className="truncate font-medium text-foreground">
+                        {n.title}
+                      </span>
+                    </div>
+                    <span className="shrink-0 text-[10px] font-mono text-muted-foreground ml-2">
+                      PDF
+                    </span>
+                  </Link>
+                ))}
+
+                {notes.length > 5 && (
+                  <Link
+                    href={`/dashboard/notes?batchId=${batch.id}`}
+                    className="block text-center text-xs font-medium text-primary hover:underline pt-1"
+                  >
+                    View all {notes.length} notes →
+                  </Link>
+                )}
+              </div>
+            )}
+          </section>
+
           {/* Announcements Section */}
-          <section className="rounded-xl border bg-card p-5 space-y-3">
+          <section className="rounded-2xl border border-border bg-card p-5 space-y-3 shadow-xs">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bell className="h-5 w-5 text-primary" />

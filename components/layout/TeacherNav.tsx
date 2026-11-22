@@ -6,12 +6,13 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Users, Megaphone, LogOut } from "lucide-react";
+import { BookOpen, Users, Megaphone, LogOut, FileText } from "lucide-react";
 import { logout } from "@/actions/auth";
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Batches", icon: Users, exact: true },
   { href: "/dashboard/lessons", label: "Lessons", icon: BookOpen, exact: false },
+  { href: "/dashboard/notes", label: "Notes", icon: FileText, exact: false },
   { href: "/dashboard/announcements", label: "Notices", icon: Megaphone, exact: false },
 ];
 

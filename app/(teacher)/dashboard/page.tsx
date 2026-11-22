@@ -4,7 +4,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { Plus, Users, BookOpen, Megaphone } from "lucide-react";
+import { Plus, Users, BookOpen, Megaphone, FileText } from "lucide-react";
 import { createServerClient } from "@/lib/supabase/server";
 import { BatchCard } from "@/components/batches/BatchCard";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -110,6 +110,13 @@ export default async function TeacherDashboardPage() {
           >
             <BookOpen className="h-3.5 w-3.5" />
             Add Lesson
+          </Link>
+          <Link
+            href="/dashboard/notes/new"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-xs font-semibold text-foreground shadow-sm transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            Upload PDF Note
           </Link>
           <Link
             href="/dashboard/announcements/new"

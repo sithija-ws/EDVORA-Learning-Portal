@@ -16,8 +16,9 @@ import {
   Sparkles,
   GraduationCap,
   Clock,
+  FileText,
 } from "lucide-react";
-import type { Lesson, Batch, Announcement } from "@/types";
+import type { Lesson, Batch, Announcement, Note } from "@/types";
 
 export const instant = false;
 
@@ -107,6 +108,29 @@ export default async function StudentHomePage() {
       .slice(0, 3);
   }
 
+  // 6. Fetch notes assigned to student's enrolled batches
+  let recentNotes: Note[] = [];
+  if (enrolledBatchIds.length > 0) {
+    const { data: noteBatches } = await supabase
+      .from("note_batches")
+      .select("note_id")
+      .in("batch_id", enrolledBatchIds);
+
+    const noteIds = Array.from(
+      new Set(noteBatches?.map((nb) => nb.note_id) ?? [])
+    );
+
+    if (noteIds.length > 0) {
+      const { data: notesData } = await supabase
+        .from("notes")
+        .select("*")
+        .in("id", noteIds)
+        .order("created_at", { ascending: false })
+        .limit(3);
+      recentNotes = notesData ?? [];
+    }
+  }
+
   const firstName = profile.full_name.split(" ")[0];
   const featuredLesson = lessons[0];
   const secondaryLessons = lessons.slice(1);
@@ -171,6 +195,21 @@ export default async function StudentHomePage() {
                   </div>
                 </div>
               </div>
+
+              <Link
+                href="/home/notes"
+                className="flex items-center gap-2 rounded-xl border border-border/80 bg-muted/30 px-3 py-2 text-xs hover:border-primary/40 transition-colors"
+              >
+                <FileText className="h-4 w-4 text-primary" />
+                <div>
+                  <div className="font-mono font-black text-foreground">
+                    {recentNotes.length}
+                  </div>
+                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground">
+                    Handouts
+                  </div>
+                </div>
+              </Link>
 
               <div className="flex items-center gap-2 rounded-xl border border-border/80 bg-muted/30 px-3 py-2 text-xs">
                 <Bell className="h-4 w-4 text-primary" />
@@ -352,7 +391,57 @@ export default async function StudentHomePage() {
         </section>
       )}
 
-      {/* ── 4. Empty State if no lessons exist ─────────────────────── */}
+      {/* ── 4. Study Notes & Handouts Shelf ──────────────────────── */}
+      {recentNotes.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-black uppercase tracking-wider text-foreground">
+                Recent Handouts & Notes
+              </h2>
+            </div>
+            <Link
+              href="/home/notes"
+              className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+            >
+              <span>All Handouts ({recentNotes.length})</span>
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            {recentNotes.map((note) => (
+              <Link
+                key={note.id}
+                href={`/home/notes/${note.id}`}
+                className="group flex flex-col justify-between rounded-2xl border border-border bg-card p-4 shadow-xs transition-all duration-200 hover:-translate-y-1 hover:border-primary/50 hover:shadow-md"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <span className="font-mono text-[9px] font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                      PDF
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-black text-foreground group-hover:text-primary transition-colors line-clamp-2 leading-snug">
+                    {note.title}
+                  </h4>
+                </div>
+
+                <div className="pt-3 border-t border-border/60 flex items-center justify-between text-[11px] font-semibold text-primary">
+                  <span>Read Handout</span>
+                  <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── 5. Empty State if no lessons exist ─────────────────────── */}
       {lessons.length === 0 && (
         <section className="rounded-2xl border border-dashed border-border bg-card/60 p-10 text-center">
           <GraduationCap className="mx-auto h-9 w-9 text-muted-foreground/40 mb-3" />

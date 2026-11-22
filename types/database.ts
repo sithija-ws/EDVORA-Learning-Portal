@@ -188,6 +188,57 @@ export interface Database {
         };
         Relationships: [];
       };
+      notes: {
+        Row: {
+          id: string;
+          title: string;
+          description: string | null;
+          file_url: string;
+          file_name: string;
+          file_size: number | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description?: string | null;
+          file_url: string;
+          file_name: string;
+          file_size?: number | null;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          description?: string | null;
+          file_url?: string;
+          file_name?: string;
+          file_size?: number | null;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      note_batches: {
+        Row: {
+          note_id: string;
+          batch_id: string;
+        };
+        Insert: {
+          note_id: string;
+          batch_id: string;
+        };
+        Update: {
+          note_id?: string;
+          batch_id?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
