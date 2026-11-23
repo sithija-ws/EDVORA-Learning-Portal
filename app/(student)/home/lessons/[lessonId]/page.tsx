@@ -44,8 +44,9 @@ export default async function StudentLessonWatchPage({
 
   // 1. Authenticate student
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? (await supabase.auth.getUser()).data.user;
 
   if (!user) {
     redirect("/login");

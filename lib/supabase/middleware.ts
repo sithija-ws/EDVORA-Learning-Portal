@@ -37,12 +37,15 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // IMPORTANT: Do not write any logic between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard
-  // to debug issues with users being randomly logged out.
+  // Fast local session verification: decodes JWT locally in memory (0ms)
+  // instead of making an external HTTPS roundtrip across the ocean.
+  // When the JWT is near expiration, getSession() automatically triggers
+  // refresh and setAll updates cookies.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const user = session?.user ?? null;
 
   return { supabaseResponse, user, supabase };
 }

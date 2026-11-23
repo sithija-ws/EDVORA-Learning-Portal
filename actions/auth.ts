@@ -5,6 +5,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
 import { loginSchema } from "@/lib/validators/auth";
 import {
@@ -95,6 +96,22 @@ export async function login(
       ? ROLE_HOME[ROLES.TEACHER]
       : ROLE_HOME[ROLES.STUDENT];
 
+  const cookieStore = await cookies();
+  cookieStore.set("edvora-role", profile.role, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
+  });
+  cookieStore.set("edvora-active", profile.is_active ? "1" : "0", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
+  });
+
   redirect(targetPath);
 }
 
@@ -103,6 +120,9 @@ export async function login(
  * and redirects to /login.
  */
 export async function logout(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete("edvora-role");
+  cookieStore.delete("edvora-active");
   const supabase = await createServerClient();
   await supabase.auth.signOut();
   redirect(LOGIN_PATH);

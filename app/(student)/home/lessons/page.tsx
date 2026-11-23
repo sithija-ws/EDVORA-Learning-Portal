@@ -28,8 +28,9 @@ export default async function StudentLessonsPage({
 
   // 1. Get current authenticated student
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? (await supabase.auth.getUser()).data.user;
 
   if (!user) {
     redirect("/login");

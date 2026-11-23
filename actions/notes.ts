@@ -6,38 +6,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createServerClient, createServerAdminClient } from "@/lib/supabase/server";
+import { createServerAdminClient } from "@/lib/supabase/server";
+import { assertTeacher } from "@/lib/auth/assert";
 import { createNoteSchema, updateNoteSchema } from "@/lib/validators/note";
-import { ROLES, MAX_PDF_FILE_SIZE } from "@/lib/constants";
+import { MAX_PDF_FILE_SIZE } from "@/lib/constants";
 import type { ActionResult } from "@/types";
 import type { Database } from "@/types/database";
-
-/**
- * Asserts the current authenticated user has the teacher role.
- */
-async function assertTeacher(): Promise<string> {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    throw new Error("Unauthorized: Please sign in");
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError || !profile || profile.role !== ROLES.TEACHER) {
-    throw new Error("Forbidden: Teacher access required");
-  }
-
-  return user.id;
-}
 
 /**
  * Ensures the notes storage bucket exists and is public.

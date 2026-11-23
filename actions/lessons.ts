@@ -6,39 +6,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createServerClient, createServerAdminClient } from "@/lib/supabase/server";
+import { createServerAdminClient } from "@/lib/supabase/server";
+import { assertTeacher } from "@/lib/auth/assert";
 import { createLessonSchema, updateLessonSchema } from "@/lib/validators/lesson";
 import { extractYouTubeId, buildThumbnailUrl } from "@/lib/utils/youtube";
-import { ROLES } from "@/lib/constants";
 import type { ActionResult } from "@/types";
 import type { Database } from "@/types/database";
-
-/**
- * Asserts the current user has the teacher role.
- */
-async function assertTeacher(): Promise<string> {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    throw new Error("Unauthorized: Please sign in");
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError || !profile || profile.role !== ROLES.TEACHER) {
-    throw new Error("Forbidden: Teacher access required");
-  }
-
-  return user.id;
-}
 
 /**
  * Creates a new lesson and assigns it to the specified batches.

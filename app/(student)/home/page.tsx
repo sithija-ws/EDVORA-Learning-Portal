@@ -31,8 +31,9 @@ export default async function StudentHomePage() {
 
   // 1. Authenticate
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) redirect("/login");
 
   // 2. Fetch profile & enrollments concurrently in a single parallel roundtrip
