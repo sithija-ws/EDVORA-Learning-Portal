@@ -38,11 +38,18 @@ export default async function TeacherNoteDetailPage({
   const { noteId } = await params;
   const supabase = await createServerClient();
 
-  const { data: noteData } = await supabase
-    .from("notes")
-    .select("*")
-    .eq("id", noteId)
-    .single();
+  // 1. Fetch note details and assigned batch junctions concurrently in parallel
+  const [{ data: noteData }, { data: junctions }] = await Promise.all([
+    supabase
+      .from("notes")
+      .select("*")
+      .eq("id", noteId)
+      .single(),
+    supabase
+      .from("note_batches")
+      .select("batch_id")
+      .eq("note_id", noteId),
+  ]);
 
   if (!noteData) {
     notFound();
@@ -50,12 +57,7 @@ export default async function TeacherNoteDetailPage({
 
   const note: Note = noteData;
 
-  // Fetch assigned batches
-  const { data: junctions } = await supabase
-    .from("note_batches")
-    .select("batch_id")
-    .eq("note_id", noteId);
-
+  // 2. Fetch assigned batches
   const batchIds = junctions?.map((j) => j.batch_id) ?? [];
   let batches: Batch[] = [];
 

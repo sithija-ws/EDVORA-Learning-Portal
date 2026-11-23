@@ -75,27 +75,29 @@ export default async function StudentNotesPage({
     );
   }
 
-  // Fetch batch details
-  const { data: enrolledBatchesData } = await supabase
-    .from("batches")
-    .select("*")
-    .in("id", enrolledBatchIds)
-    .order("year", { ascending: false });
-
-  const enrolledBatches: Batch[] = enrolledBatchesData ?? [];
-  const batchMap = new Map(enrolledBatches.map((b) => [b.id, b]));
-
   // Selected batch filter
   const effectiveBatchFilter =
     batchId && enrolledBatchIds.includes(batchId) ? batchId : null;
 
-  // 4. Fetch note assignments for enrolled batches
-  const noteBatchesQuery = supabase
-    .from("note_batches")
-    .select("note_id, batch_id")
-    .in("batch_id", effectiveBatchFilter ? [effectiveBatchFilter] : enrolledBatchIds);
+  // 3. Stage 2 concurrent fetch: enrolled batches and note assignments in parallel
+  const [{ data: enrolledBatchesData }, { data: noteBatchesData }] =
+    await Promise.all([
+      supabase
+        .from("batches")
+        .select("*")
+        .in("id", enrolledBatchIds)
+        .order("year", { ascending: false }),
+      supabase
+        .from("note_batches")
+        .select("note_id, batch_id")
+        .in(
+          "batch_id",
+          effectiveBatchFilter ? [effectiveBatchFilter] : enrolledBatchIds
+        ),
+    ]);
 
-  const { data: noteBatchesData } = await noteBatchesQuery;
+  const enrolledBatches: Batch[] = enrolledBatchesData ?? [];
+  const batchMap = new Map(enrolledBatches.map((b) => [b.id, b]));
 
   const noteToBatchesMap = new Map<string, Batch[]>();
   const noteIdSet = new Set<string>();

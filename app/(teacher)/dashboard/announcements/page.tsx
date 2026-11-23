@@ -25,15 +25,21 @@ export default async function TeacherAnnouncementsPage({
   const { batchId } = await searchParams;
   const supabase = await createServerClient();
 
-  // 1. Fetch batches and announcement_batches junctions concurrently in parallel
-  const [{ data: batchesData }, { data: annBatchesData }] = await Promise.all([
-    supabase
-      .from("batches")
-      .select("*")
-      .order("year", { ascending: false })
-      .order("name", { ascending: true }),
-    supabase.from("announcement_batches").select("announcement_id, batch_id"),
-  ]);
+  // 1. Fetch batches, junctions, and announcements concurrently in 1 parallel roundtrip
+  const [{ data: batchesData }, { data: annBatchesData }, { data: announcementsData }] =
+    await Promise.all([
+      supabase
+        .from("batches")
+        .select("*")
+        .order("year", { ascending: false })
+        .order("name", { ascending: true }),
+      supabase.from("announcement_batches").select("announcement_id, batch_id"),
+      supabase
+        .from("announcements")
+        .select("*")
+        .order("is_pinned", { ascending: false })
+        .order("created_at", { ascending: false }),
+    ]);
 
   const batches: Batch[] = batchesData ?? [];
   const batchMap = new Map(batches.map((b) => [b.id, b]));
@@ -52,13 +58,6 @@ export default async function TeacherAnnouncementsPage({
       scopedAnnIdsForBatch.add(ab.announcement_id);
     }
   });
-
-  // 3. Fetch announcements (ordered by pinned first, then newest first)
-  const { data: announcementsData } = await supabase
-    .from("announcements")
-    .select("*")
-    .order("is_pinned", { ascending: false })
-    .order("created_at", { ascending: false });
 
   let allAnnouncements: Announcement[] = announcementsData ?? [];
 

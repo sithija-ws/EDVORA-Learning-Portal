@@ -75,29 +75,35 @@ export default async function StudentAnnouncementsPage({
     );
   }
 
-  // 4. Fetch batch details
-  const { data: batchesData } = await supabase
-    .from("batches")
-    .select("*")
-    .in("id", enrolledBatchIds)
-    .order("year", { ascending: false });
-
-  const enrolledBatches: Batch[] = batchesData ?? [];
-  const batchMap = new Map(enrolledBatches.map((b) => [b.id, b]));
-
   // Selected batch filter
   const effectiveBatchFilter =
     batchId && enrolledBatchIds.includes(batchId) ? batchId : null;
 
-  // 5. Fetch scoped announcement IDs
   const targetBatchIds = effectiveBatchFilter
     ? [effectiveBatchFilter]
     : enrolledBatchIds;
 
-  const { data: annBatchesData } = await supabase
-    .from("announcement_batches")
-    .select("announcement_id, batch_id")
-    .in("batch_id", targetBatchIds);
+  // 3. Stage 2 concurrent fetch: batches, announcement_batches, and announcements in parallel
+  const [{ data: batchesData }, { data: annBatchesData }, { data: announcementsData }] =
+    await Promise.all([
+      supabase
+        .from("batches")
+        .select("*")
+        .in("id", enrolledBatchIds)
+        .order("year", { ascending: false }),
+      supabase
+        .from("announcement_batches")
+        .select("announcement_id, batch_id")
+        .in("batch_id", targetBatchIds),
+      supabase
+        .from("announcements")
+        .select("*")
+        .order("is_pinned", { ascending: false })
+        .order("created_at", { ascending: false }),
+    ]);
+
+  const enrolledBatches: Batch[] = batchesData ?? [];
+  const batchMap = new Map(enrolledBatches.map((b) => [b.id, b]));
 
   const annToBatchesMap = new Map<string, Batch[]>();
   const scopedAnnIdSet = new Set<string>();
@@ -111,13 +117,6 @@ export default async function StudentAnnouncementsPage({
       annToBatchesMap.set(ab.announcement_id, existing);
     }
   });
-
-  // 6. Fetch announcements
-  const { data: announcementsData } = await supabase
-    .from("announcements")
-    .select("*")
-    .order("is_pinned", { ascending: false })
-    .order("created_at", { ascending: false });
 
   const allNotices: Announcement[] = announcementsData ?? [];
 

@@ -25,22 +25,66 @@ export default async function TeacherLessonsPage({
   const { batchId } = await searchParams;
   const supabase = await createServerClient();
 
-  // 1. Fetch all batches and lesson_batches junctions concurrently in parallel
-  const [{ data: batchesData }, { data: lessonBatchesData }] = await Promise.all([
-    supabase
-      .from("batches")
-      .select("*")
-      .order("year", { ascending: false })
-      .order("name", { ascending: true }),
-    supabase.from("lesson_batches").select("lesson_id, batch_id"),
-  ]);
+  let batchesData: Batch[] | null = null;
+  let lessonBatchesData: { lesson_id: string; batch_id: string }[] | null = null;
+  let lessonsData: Lesson[] | null = null;
+
+  if (!batchId) {
+    // Fast-path: When viewing all lessons (default), fetch batches, junctions, and lessons concurrently in 1 parallel roundtrip
+    const [bRes, lbRes, lRes] = await Promise.all([
+      supabase
+        .from("batches")
+        .select("*")
+        .order("year", { ascending: false })
+        .order("name", { ascending: true }),
+      supabase.from("lesson_batches").select("lesson_id, batch_id"),
+      supabase
+        .from("lessons")
+        .select("*")
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: false }),
+    ]);
+    batchesData = bRes.data;
+    lessonBatchesData = lbRes.data;
+    lessonsData = lRes.data;
+  } else {
+    // When batchId filter is specified, fetch batches & junctions first to resolve batch-assigned lesson IDs
+    const [bRes, lbRes] = await Promise.all([
+      supabase
+        .from("batches")
+        .select("*")
+        .order("year", { ascending: false })
+        .order("name", { ascending: true }),
+      supabase.from("lesson_batches").select("lesson_id, batch_id"),
+    ]);
+    batchesData = bRes.data;
+    lessonBatchesData = lbRes.data;
+
+    const scopedLessonIds: string[] = [];
+    lbRes.data?.forEach((lb) => {
+      if (lb.batch_id === batchId) {
+        scopedLessonIds.push(lb.lesson_id);
+      }
+    });
+
+    if (scopedLessonIds.length > 0) {
+      const { data: lData } = await supabase
+        .from("lessons")
+        .select("*")
+        .in("id", scopedLessonIds)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: false });
+      lessonsData = lData;
+    } else {
+      lessonsData = [];
+    }
+  }
 
   const batches: Batch[] = batchesData ?? [];
   const batchMap = new Map(batches.map((b) => [b.id, b]));
 
   // Map lessonId -> array of Batch
   const lessonToBatchesMap = new Map<string, Batch[]>();
-  const lessonIdsForSelectedBatch = new Set<string>();
 
   lessonBatchesData?.forEach((lb) => {
     const b = batchMap.get(lb.batch_id);
@@ -49,29 +93,8 @@ export default async function TeacherLessonsPage({
       existing.push(b);
       lessonToBatchesMap.set(lb.lesson_id, existing);
     }
-    if (batchId && lb.batch_id === batchId) {
-      lessonIdsForSelectedBatch.add(lb.lesson_id);
-    }
   });
 
-  // 3. Fetch lessons
-  let lessonsQuery = supabase
-    .from("lessons")
-    .select("*")
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: false });
-
-  if (batchId) {
-    const ids = Array.from(lessonIdsForSelectedBatch);
-    if (ids.length > 0) {
-      lessonsQuery = lessonsQuery.in("id", ids);
-    } else {
-      // No lessons assigned to this batch
-      lessonsQuery = lessonsQuery.eq("id", "00000000-0000-0000-0000-000000000000");
-    }
-  }
-
-  const { data: lessonsData } = await lessonsQuery;
   const lessons: Lesson[] = lessonsData ?? [];
 
   return (

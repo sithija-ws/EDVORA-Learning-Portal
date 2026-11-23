@@ -25,22 +25,64 @@ export default async function TeacherNotesPage({
   const { batchId } = await searchParams;
   const supabase = await createServerClient();
 
-  // 1. Fetch all batches and note-batch junction mappings concurrently in parallel
-  const [{ data: batchesData }, { data: allNoteBatches }] = await Promise.all([
-    supabase
-      .from("batches")
-      .select("*")
-      .order("year", { ascending: false })
-      .order("name", { ascending: true }),
-    supabase.from("note_batches").select("note_id, batch_id"),
-  ]);
+  let batchesData: Batch[] | null = null;
+  let allNoteBatches: { note_id: string; batch_id: string }[] | null = null;
+  let notesData: Note[] | null = null;
+
+  if (!batchId) {
+    // Fast-path: When viewing all notes (default), fetch batches, junctions, and notes concurrently in 1 parallel roundtrip
+    const [bRes, nbRes, nRes] = await Promise.all([
+      supabase
+        .from("batches")
+        .select("*")
+        .order("year", { ascending: false })
+        .order("name", { ascending: true }),
+      supabase.from("note_batches").select("note_id, batch_id"),
+      supabase
+        .from("notes")
+        .select("*")
+        .order("created_at", { ascending: false }),
+    ]);
+    batchesData = bRes.data;
+    allNoteBatches = nbRes.data;
+    notesData = nRes.data;
+  } else {
+    // When batchId is present, fetch batches & junctions first to resolve scoped note IDs
+    const [bRes, nbRes] = await Promise.all([
+      supabase
+        .from("batches")
+        .select("*")
+        .order("year", { ascending: false })
+        .order("name", { ascending: true }),
+      supabase.from("note_batches").select("note_id, batch_id"),
+    ]);
+    batchesData = bRes.data;
+    allNoteBatches = nbRes.data;
+
+    const scopedNoteIds: string[] = [];
+    nbRes.data?.forEach((nb) => {
+      if (nb.batch_id === batchId) {
+        scopedNoteIds.push(nb.note_id);
+      }
+    });
+
+    if (scopedNoteIds.length > 0) {
+      const { data: nData } = await supabase
+        .from("notes")
+        .select("*")
+        .in("id", scopedNoteIds)
+        .order("created_at", { ascending: false });
+      notesData = nData;
+    } else {
+      notesData = [];
+    }
+  }
 
   const batches: Batch[] = batchesData ?? [];
   const batchMap = new Map(batches.map((b) => [b.id, b]));
 
   // Build noteId -> Batch[] map in memory
   const noteToBatchesMap = new Map<string, Batch[]>();
-  const scopedNoteIds = new Set<string>();
 
   allNoteBatches?.forEach((nb) => {
     const b = batchMap.get(nb.batch_id);
@@ -49,23 +91,8 @@ export default async function TeacherNotesPage({
       existing.push(b);
       noteToBatchesMap.set(nb.note_id, existing);
     }
-    if (batchId && nb.batch_id === batchId) {
-      scopedNoteIds.add(nb.note_id);
-    }
   });
 
-  // 2. Fetch notes
-  let notesQuery = supabase
-    .from("notes")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (batchId) {
-    const noteIds = Array.from(scopedNoteIds);
-    notesQuery = notesQuery.in("id", noteIds.length > 0 ? noteIds : ["00000000-0000-0000-0000-000000000000"]);
-  }
-
-  const { data: notesData } = await notesQuery;
   const notes: Note[] = notesData ?? [];
 
   return (

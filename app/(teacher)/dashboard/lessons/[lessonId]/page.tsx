@@ -38,12 +38,18 @@ export default async function TeacherLessonDetailPage({
   const { lessonId } = await params;
   const supabase = await createServerClient();
 
-  // 1. Fetch lesson details
-  const { data: lessonData } = await supabase
-    .from("lessons")
-    .select("*")
-    .eq("id", lessonId)
-    .single();
+  // 1. Fetch lesson details and assigned batch junctions concurrently in parallel
+  const [{ data: lessonData }, { data: lessonBatches }] = await Promise.all([
+    supabase
+      .from("lessons")
+      .select("*")
+      .eq("id", lessonId)
+      .single(),
+    supabase
+      .from("lesson_batches")
+      .select("batch_id")
+      .eq("lesson_id", lessonId),
+  ]);
 
   if (!lessonData) {
     notFound();
@@ -52,11 +58,6 @@ export default async function TeacherLessonDetailPage({
   const lesson: Lesson = lessonData;
 
   // 2. Fetch assigned batches
-  const { data: lessonBatches } = await supabase
-    .from("lesson_batches")
-    .select("batch_id")
-    .eq("lesson_id", lessonId);
-
   const batchIds = lessonBatches?.map((lb) => lb.batch_id) ?? [];
   let assignedBatches: Batch[] = [];
 

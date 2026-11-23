@@ -52,67 +52,70 @@ export default async function StudentLessonWatchPage({
     redirect("/login");
   }
 
-  // 2. Verify active status
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_active")
-    .eq("id", user.id)
-    .single();
+  // 2. Stage 1 concurrent fetch: profile, enrollments, lesson, and lesson_batches in parallel
+  const [
+    { data: profile },
+    { data: enrollments },
+    { data: lessonData },
+    { data: lessonBatches },
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("is_active")
+      .eq("id", user.id)
+      .single(),
+    supabase
+      .from("enrollments")
+      .select("batch_id")
+      .eq("student_id", user.id),
+    supabase
+      .from("lessons")
+      .select("*")
+      .eq("id", lessonId)
+      .single(),
+    supabase
+      .from("lesson_batches")
+      .select("batch_id")
+      .eq("lesson_id", lessonId),
+  ]);
 
   if (!profile || !profile.is_active) {
     redirect("/disabled");
   }
 
-  // 3. Fetch student's enrolled batches
-  const { data: enrollments } = await supabase
-    .from("enrollments")
-    .select("batch_id")
-    .eq("student_id", user.id);
-
-  const enrolledBatchIds = enrollments?.map((e) => e.batch_id) ?? [];
-
-  if (enrolledBatchIds.length === 0) {
-    notFound();
-  }
-
-  // 4. Verify batch authorization: Lesson must belong to at least one enrolled batch
-  const { data: matchingJunction } = await supabase
-    .from("lesson_batches")
-    .select("batch_id")
-    .eq("lesson_id", lessonId)
-    .in("batch_id", enrolledBatchIds);
-
-  if (!matchingJunction || matchingJunction.length === 0) {
-    notFound();
-  }
-
-  const currentBatchId = matchingJunction[0].batch_id;
-
-  // 5. Fetch lesson details
-  const { data: lessonData } = await supabase
-    .from("lessons")
-    .select("*")
-    .eq("id", lessonId)
-    .single();
-
   if (!lessonData) {
     notFound();
   }
 
+  const enrolledBatchIds = enrollments?.map((e) => e.batch_id) ?? [];
+  if (enrolledBatchIds.length === 0) {
+    notFound();
+  }
+
+  // Verify batch authorization: Lesson must belong to at least one enrolled batch
+  const matchingJunction = lessonBatches?.filter((lb) =>
+    enrolledBatchIds.includes(lb.batch_id)
+  ) ?? [];
+
+  if (matchingJunction.length === 0) {
+    notFound();
+  }
+
+  const currentBatchId = matchingJunction[0].batch_id;
   const lesson: Lesson = lessonData;
 
-  // 6. Fetch batch info
-  const { data: batchData } = await supabase
-    .from("batches")
-    .select("name, year")
-    .eq("id", currentBatchId)
-    .single();
-
-  // 7. Fetch sibling lessons in the same batch for continuous playlist navigation
-  const { data: batchJunctions } = await supabase
-    .from("lesson_batches")
-    .select("lesson_id")
-    .eq("batch_id", currentBatchId);
+  // 3. Stage 2 concurrent fetch: batch details and sibling lesson junctions in parallel
+  const [{ data: batchData }, { data: batchJunctions }] = await Promise.all([
+    supabase
+      .from("batches")
+      .select("name, year")
+      .eq("id", currentBatchId)
+      .single(),
+    supabase
+      .from("lesson_batches")
+      .select("lesson_id")
+      .eq("batch_id", currentBatchId),
+  ]);
 
   const siblingIds = batchJunctions?.map((bj) => bj.lesson_id) ?? [];
 
