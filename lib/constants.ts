@@ -18,6 +18,7 @@ export const STUDENT_EMAIL_DOMAIN = "edvora.internal" as const;
 export const ROLES = {
   TEACHER: "teacher",
   STUDENT: "student",
+  ADMIN: "admin",
 } as const;
 
 export type Role = (typeof ROLES)[keyof typeof ROLES];
@@ -30,15 +31,24 @@ export type Role = (typeof ROLES)[keyof typeof ROLES];
 export const ROLE_HOME = {
   [ROLES.TEACHER]: "/dashboard",
   [ROLES.STUDENT]: "/home",
+  [ROLES.ADMIN]: "/admin/dashboard",
 } as const;
 
 /**
  * Public routes that do not require authentication.
  */
-export const PUBLIC_ROUTES = ["/login", "/disabled"] as const;
+export const PUBLIC_ROUTES = [
+  "/login",
+  "/disabled",
+  "/register",
+  "/student/login",
+  "/teacher/login",
+  "/teacher/register",
+  "/admin/login",
+] as const;
 
 /**
- * The login page path.
+ * The login page path (legacy / unified).
  */
 export const LOGIN_PATH = "/login" as const;
 
@@ -46,6 +56,20 @@ export const LOGIN_PATH = "/login" as const;
  * The disabled account page path.
  */
 export const DISABLED_PATH = "/disabled" as const;
+
+/**
+ * The teacher registration page path.
+ */
+export const REGISTER_PATH = "/register" as const;
+
+/**
+ * Dedicated portal paths.
+ */
+export const STUDENT_LOGIN_PATH = "/student/login" as const;
+export const TEACHER_LOGIN_PATH = "/teacher/login" as const;
+export const TEACHER_REGISTER_PATH = "/teacher/register" as const;
+export const ADMIN_LOGIN_PATH = "/admin/login" as const;
+export const ADMIN_DASHBOARD_PATH = "/admin/dashboard" as const;
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
 

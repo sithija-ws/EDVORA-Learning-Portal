@@ -28,16 +28,15 @@ export default async function StudentAnnouncementsPage({
 
   // 1. Authenticate student
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const user = session?.user ?? (await supabase.auth.getUser()).data.user;
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     redirect("/login");
   }
 
-  // 2. Verify active profile & enrolled batches concurrently in parallel
-  const [{ data: profile }, { data: enrollments }] = await Promise.all([
+  // 2. Verify active profile, enrolled batches, and tenant memberships in parallel
+  const [{ data: profile }, { data: enrollments }, { data: identities }] = await Promise.all([
     supabase
       .from("profiles")
       .select("is_active")
@@ -45,7 +44,11 @@ export default async function StudentAnnouncementsPage({
       .single(),
     supabase
       .from("enrollments")
-      .select("batch_id")
+      .select("batch_id, tenant_id")
+      .eq("student_id", user.id),
+    supabase
+      .from("student_identities")
+      .select("tenant_id")
       .eq("student_id", user.id),
   ]);
 
@@ -54,8 +57,14 @@ export default async function StudentAnnouncementsPage({
   }
 
   const enrolledBatchIds = enrollments?.map((e) => e.batch_id) ?? [];
+  const studentTenantIds = Array.from(
+    new Set([
+      ...(identities?.map((i) => i.tenant_id) ?? []),
+      ...((enrollments?.map((e) => e.tenant_id).filter(Boolean) as string[]) ?? []),
+    ])
+  );
 
-  if (enrolledBatchIds.length === 0) {
+  if (enrolledBatchIds.length === 0 || studentTenantIds.length === 0) {
     return (
       <div className="p-4 space-y-4">
         <PageHeader
@@ -83,21 +92,24 @@ export default async function StudentAnnouncementsPage({
     ? [effectiveBatchFilter]
     : enrolledBatchIds;
 
-  // 3. Stage 2 concurrent fetch: batches, announcement_batches, and announcements in parallel
+  // 3. Stage 2 concurrent fetch: batches, announcement_batches, and announcements in parallel scoped to tenant
   const [{ data: batchesData }, { data: annBatchesData }, { data: announcementsData }] =
     await Promise.all([
       supabase
         .from("batches")
         .select("*")
         .in("id", enrolledBatchIds)
+        .in("tenant_id", studentTenantIds)
         .order("year", { ascending: false }),
       supabase
         .from("announcement_batches")
         .select("announcement_id, batch_id")
-        .in("batch_id", targetBatchIds),
+        .in("batch_id", targetBatchIds)
+        .in("tenant_id", studentTenantIds),
       supabase
         .from("announcements")
         .select("*")
+        .in("tenant_id", studentTenantIds)
         .order("is_pinned", { ascending: false })
         .order("created_at", { ascending: false }),
     ]);
@@ -119,14 +131,20 @@ export default async function StudentAnnouncementsPage({
   });
 
   const allNotices: Announcement[] = announcementsData ?? [];
+  const selectedBatch = effectiveBatchFilter ? batchMap.get(effectiveBatchFilter) : null;
+  const selectedBatchTenantId = selectedBatch?.tenant_id;
+  const enrolledTenantIds = new Set(enrolledBatches.map((b) => b.tenant_id));
 
-  // Filter: Broadcast notices OR notices assigned to student's enrolled batches
+  // Filter: Broadcast notices strictly from relevant workspace OR notices assigned to student's enrolled batches
   const studentAnnouncements = allNotices.filter((a) => {
     if (effectiveBatchFilter) {
-      // If student filtered by specific batch: show notices scoped to that batch (or broadcast if wanted)
-      return scopedAnnIdSet.has(a.id) || a.is_broadcast;
+      // If student filtered by specific batch: show notices explicitly targeted to that batch,
+      // or broadcast notices strictly within the SAME workspace/tenant as that batch.
+      return scopedAnnIdSet.has(a.id) || (a.is_broadcast && a.tenant_id === selectedBatchTenantId);
     }
-    return a.is_broadcast || scopedAnnIdSet.has(a.id);
+    // If viewing all batches: broadcast notice must belong to a workspace the student has enrolled batches in,
+    // or the notice must be explicitly assigned to one of their enrolled batches.
+    return (a.is_broadcast && enrolledTenantIds.has(a.tenant_id)) || scopedAnnIdSet.has(a.id);
   });
 
   return (

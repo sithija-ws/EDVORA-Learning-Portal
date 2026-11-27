@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:saas": "node --experimental-strip-types --import ./tests/saas/register.mjs --test tests/saas/auth-foundation.test.ts tests/saas/actions-security.test.ts tests/saas/student-auth-isolation.test.ts tests/saas/trial-subscription.test.ts tests/saas/admin-onboarding.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

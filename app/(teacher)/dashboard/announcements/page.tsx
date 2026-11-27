@@ -5,6 +5,7 @@ import React from "react";
 import Link from "next/link";
 import { Plus, Bell } from "lucide-react";
 import { createServerClient } from "@/lib/supabase/server";
+import { requireTenantContext } from "@/lib/auth/tenant";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { AnnouncementCard } from "@/components/announcements/AnnouncementCard";
 import type { Announcement, Batch } from "@/types";
@@ -23,20 +24,26 @@ export default async function TeacherAnnouncementsPage({
   searchParams,
 }: AnnouncementsPageProps) {
   const { batchId } = await searchParams;
+  const tenant = await requireTenantContext();
   const supabase = await createServerClient();
 
-  // 1. Fetch batches, junctions, and announcements concurrently in 1 parallel roundtrip
+  // 1. Fetch batches, junctions, and announcements concurrently in 1 parallel roundtrip scoped to tenant
   const [{ data: batchesData }, { data: annBatchesData }, { data: announcementsData }] =
     await Promise.all([
       supabase
         .from("batches")
         .select("*")
+        .eq("tenant_id", tenant.tenantId)
         .order("year", { ascending: false })
         .order("name", { ascending: true }),
-      supabase.from("announcement_batches").select("announcement_id, batch_id"),
+      supabase
+        .from("announcement_batches")
+        .select("announcement_id, batch_id")
+        .eq("tenant_id", tenant.tenantId),
       supabase
         .from("announcements")
         .select("*")
+        .eq("tenant_id", tenant.tenantId)
         .order("is_pinned", { ascending: false })
         .order("created_at", { ascending: false }),
     ]);

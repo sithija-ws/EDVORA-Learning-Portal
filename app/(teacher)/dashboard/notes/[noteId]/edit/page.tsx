@@ -4,6 +4,7 @@
 import React from "react";
 import { notFound } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { requireTenantContext, getTenantContext } from "@/lib/auth/tenant";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { NoteForm } from "@/components/notes/NoteForm";
 import type { Note, Batch } from "@/types";
@@ -16,12 +17,17 @@ interface EditNotePageProps {
 
 export async function generateMetadata({ params }: EditNotePageProps) {
   const { noteId } = await params;
+  const tenantRes = await getTenantContext();
+  if (tenantRes.status !== "resolved") {
+    return { title: "Edit Note – Edvora" };
+  }
   const supabase = await createServerClient();
   const { data: note } = await supabase
     .from("notes")
     .select("title")
     .eq("id", noteId)
-    .single();
+    .eq("tenant_id", tenantRes.context.tenantId)
+    .maybeSingle();
 
   return {
     title: note ? `Edit: ${note.title} – Edvora` : "Edit Note – Edvora",
@@ -30,12 +36,14 @@ export async function generateMetadata({ params }: EditNotePageProps) {
 
 export default async function EditNotePage({ params }: EditNotePageProps) {
   const { noteId } = await params;
+  const tenant = await requireTenantContext();
   const supabase = await createServerClient();
 
   const { data: noteData } = await supabase
     .from("notes")
     .select("*")
     .eq("id", noteId)
+    .eq("tenant_id", tenant.tenantId)
     .single();
 
   if (!noteData) {
@@ -47,13 +55,15 @@ export default async function EditNotePage({ params }: EditNotePageProps) {
   const { data: junctions } = await supabase
     .from("note_batches")
     .select("batch_id")
-    .eq("note_id", noteId);
+    .eq("note_id", noteId)
+    .eq("tenant_id", tenant.tenantId);
 
   const assignedBatchIds = junctions?.map((j) => j.batch_id) ?? [];
 
   const { data: batchesData } = await supabase
     .from("batches")
     .select("*")
+    .eq("tenant_id", tenant.tenantId)
     .order("year", { ascending: false })
     .order("name", { ascending: true });
 

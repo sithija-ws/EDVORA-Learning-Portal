@@ -1,33 +1,32 @@
 // actions/lessons.ts
-// Server Actions for lesson management (Teacher only).
-// Privileged operations utilize createServerAdminClient() on the server.
+// Server Actions for lesson management with strict multi-tenant isolation.
 
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createServerAdminClient } from "@/lib/supabase/server";
-import { assertTeacher } from "@/lib/auth/assert";
+import { createServerClient } from "@/lib/supabase/server";
+import { requireActiveSubscription } from "@/lib/auth/tenant";
 import { createLessonSchema, updateLessonSchema } from "@/lib/validators/lesson";
 import { extractYouTubeId, buildThumbnailUrl } from "@/lib/utils/youtube";
 import type { ActionResult } from "@/types";
 import type { Database } from "@/types/database";
 
 /**
- * Creates a new lesson and assigns it to the specified batches.
+ * Creates a new lesson and assigns it to batches within the caller's active tenant.
  */
 export async function createLesson(
   _prevState: ActionResult<void> | null,
   formData: FormData
 ): Promise<ActionResult<void>> {
-  let teacherId: string;
+  let tenant;
   try {
-    teacherId = await assertTeacher();
+    tenant = await requireActiveSubscription("lessons:create_edit");
   } catch (err: unknown) {
     return {
       success: false,
       data: null,
-      error: err instanceof Error ? err.message : "Authentication failed",
+      error: err instanceof Error ? err.message : "Authentication required",
     };
   }
 
@@ -66,18 +65,36 @@ export async function createLesson(
   }
 
   const thumbnail_url = buildThumbnailUrl(youtube_id);
-  const adminClient = createServerAdminClient();
+  const supabase = await createServerClient();
 
-  // 1. Insert lesson row
-  const { data: lessonData, error: lessonError } = await adminClient
+  // Validate ownership of all related batches before creating associations
+  if (batch_ids && batch_ids.length > 0) {
+    const { data: validBatches, error: batchErr } = await supabase
+      .from("batches")
+      .select("id")
+      .in("id", batch_ids)
+      .eq("tenant_id", tenant.tenantId);
+
+    if (batchErr || !validBatches || validBatches.length !== batch_ids.length) {
+      return {
+        success: false,
+        data: null,
+        error: "One or more selected batches are invalid or unauthorized",
+      };
+    }
+  }
+
+  // 1. Insert lesson row with tenant_id scoping
+  const { data: lessonData, error: lessonError } = await supabase
     .from("lessons")
     .insert({
+      tenant_id: tenant.tenantId,
       title,
       description: description || null,
       youtube_id,
       thumbnail_url,
       sort_order: sort_order ?? 0,
-      created_by: teacherId,
+      created_by: tenant.userId,
     })
     .select("id")
     .single();
@@ -92,24 +109,30 @@ export async function createLesson(
 
   const newLessonId = lessonData.id;
 
-  // 2. Insert junction rows into lesson_batches
-  const lessonBatchRows = batch_ids.map((bId) => ({
-    lesson_id: newLessonId,
-    batch_id: bId,
-  }));
+  // 2. Insert junction rows with tenant_id scoping
+  if (batch_ids && batch_ids.length > 0) {
+    const lessonBatchRows = batch_ids.map((bId) => ({
+      tenant_id: tenant.tenantId,
+      lesson_id: newLessonId,
+      batch_id: bId,
+    }));
 
-  const { error: junctionError } = await adminClient
-    .from("lesson_batches")
-    .insert(lessonBatchRows);
+    const { error: junctionError } = await supabase
+      .from("lesson_batches")
+      .insert(lessonBatchRows);
 
-  if (junctionError) {
-    // Rollback lesson insertion
-    await adminClient.from("lessons").delete().eq("id", newLessonId);
-    return {
-      success: false,
-      data: null,
-      error: `Failed to assign batches to lesson: ${junctionError.message}`,
-    };
+    if (junctionError) {
+      await supabase
+        .from("lessons")
+        .delete()
+        .eq("id", newLessonId)
+        .eq("tenant_id", tenant.tenantId);
+      return {
+        success: false,
+        data: null,
+        error: `Failed to assign batches to lesson: ${junctionError.message}`,
+      };
+    }
   }
 
   // Revalidate cache paths
@@ -124,20 +147,21 @@ export async function createLesson(
 }
 
 /**
- * Updates an existing lesson's details and batch assignments.
+ * Updates an existing lesson's details and batch assignments within caller's active tenant.
  */
 export async function updateLesson(
   lessonId: string,
   _prevState: ActionResult<void> | null,
   formData: FormData
 ): Promise<ActionResult<void>> {
+  let tenant;
   try {
-    await assertTeacher();
+    tenant = await requireActiveSubscription("lessons:create_edit");
   } catch (err: unknown) {
     return {
       success: false,
       data: null,
-      error: err instanceof Error ? err.message : "Authentication failed",
+      error: err instanceof Error ? err.message : "Authentication required",
     };
   }
 
@@ -167,7 +191,7 @@ export async function updateLesson(
     };
   }
 
-  const adminClient = createServerAdminClient();
+  const supabase = await createServerClient();
   const lessonUpdates: Database["public"]["Tables"]["lessons"]["Update"] = {};
 
   if (parseResult.data.title !== undefined) {
@@ -192,11 +216,31 @@ export async function updateLesson(
     lessonUpdates.thumbnail_url = buildThumbnailUrl(youtube_id);
   }
 
+  // Verify lesson belongs to caller's tenant before updating (unconditional check)
+  const { data: existingLesson, error: verifyError } = await supabase
+    .from("lessons")
+    .select("id")
+    .eq("id", lessonId)
+    .eq("tenant_id", tenant.tenantId)
+    .maybeSingle();
+
+  if (verifyError || !existingLesson) {
+    return {
+      success: false,
+      data: null,
+      error: "Lesson not found or unauthorized",
+    };
+  }
+
+  // Apply lesson field updates if provided
   if (Object.keys(lessonUpdates).length > 0) {
-    const { error: updateError } = await adminClient
+    const { data: updatedLesson, error: updateError } = await supabase
       .from("lessons")
       .update(lessonUpdates)
-      .eq("id", lessonId);
+      .eq("id", lessonId)
+      .eq("tenant_id", tenant.tenantId)
+      .select("id")
+      .maybeSingle();
 
     if (updateError) {
       return {
@@ -205,16 +249,41 @@ export async function updateLesson(
         error: updateError.message,
       };
     }
+
+    if (!updatedLesson) {
+      return {
+        success: false,
+        data: null,
+        error: "Lesson not found or unauthorized",
+      };
+    }
   }
 
-  // Synchronize batch assignments if provided
+  // Synchronize batch assignments if provided, validating related batch ownership
   if (parseResult.data.batch_ids !== undefined) {
     const desiredBatchIds = new Set(parseResult.data.batch_ids);
 
-    const { data: currentAssignments, error: fetchError } = await adminClient
+    if (desiredBatchIds.size > 0) {
+      const { data: validBatches, error: batchErr } = await supabase
+        .from("batches")
+        .select("id")
+        .in("id", Array.from(desiredBatchIds))
+        .eq("tenant_id", tenant.tenantId);
+
+      if (batchErr || !validBatches || validBatches.length !== desiredBatchIds.size) {
+        return {
+          success: false,
+          data: null,
+          error: "One or more selected batches are invalid or unauthorized",
+        };
+      }
+    }
+
+    const { data: currentAssignments, error: fetchError } = await supabase
       .from("lesson_batches")
       .select("batch_id")
-      .eq("lesson_id", lessonId);
+      .eq("lesson_id", lessonId)
+      .eq("tenant_id", tenant.tenantId);
 
     if (fetchError) {
       return {
@@ -224,16 +293,17 @@ export async function updateLesson(
       };
     }
 
-    const currentBatchIds = new Set(currentAssignments.map((a) => a.batch_id));
+    const currentBatchIds = new Set((currentAssignments ?? []).map((a) => a.batch_id));
 
     const toAdd = [...desiredBatchIds].filter((bId) => !currentBatchIds.has(bId));
     const toRemove = [...currentBatchIds].filter((bId) => !desiredBatchIds.has(bId));
 
     if (toRemove.length > 0) {
-      const { error: removeError } = await adminClient
+      const { error: removeError } = await supabase
         .from("lesson_batches")
         .delete()
         .eq("lesson_id", lessonId)
+        .eq("tenant_id", tenant.tenantId)
         .in("batch_id", toRemove);
 
       if (removeError) {
@@ -247,11 +317,12 @@ export async function updateLesson(
 
     if (toAdd.length > 0) {
       const insertRows = toAdd.map((bId) => ({
+        tenant_id: tenant.tenantId,
         lesson_id: lessonId,
         batch_id: bId,
       }));
 
-      const { error: addError } = await adminClient
+      const { error: addError } = await supabase
         .from("lesson_batches")
         .insert(insertRows);
 
@@ -281,31 +352,44 @@ export async function updateLesson(
 }
 
 /**
- * Deletes a lesson and cascades to its batch junction records.
+ * Deletes a lesson strictly scoped to caller's active tenant.
  */
 export async function deleteLesson(lessonId: string): Promise<ActionResult<void>> {
+  let tenant;
   try {
-    await assertTeacher();
+    tenant = await requireActiveSubscription("lessons:delete");
   } catch (err: unknown) {
     return {
       success: false,
       data: null,
-      error: err instanceof Error ? err.message : "Authentication failed",
+      error: err instanceof Error ? err.message : "Authentication required",
     };
   }
 
-  const adminClient = createServerAdminClient();
+  const supabase = await createServerClient();
 
-  const { error } = await adminClient
+  // Strict tenant scoping prevents deleting another workspace's lesson
+  const { data, error } = await supabase
     .from("lessons")
     .delete()
-    .eq("id", lessonId);
+    .eq("id", lessonId)
+    .eq("tenant_id", tenant.tenantId)
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     return {
       success: false,
       data: null,
       error: error.message,
+    };
+  }
+
+  if (!data) {
+    return {
+      success: false,
+      data: null,
+      error: "Lesson not found or unauthorized",
     };
   }
 
@@ -323,28 +407,30 @@ export async function deleteLesson(lessonId: string): Promise<ActionResult<void>
 }
 
 /**
- * Updates sort orders for a list of lessons.
+ * Updates sort orders for a list of lessons strictly scoped to caller's active tenant.
  */
 export async function reorderLessons(
   items: Array<{ id: string; sort_order: number }>
 ): Promise<ActionResult<void>> {
+  let tenant;
   try {
-    await assertTeacher();
+    tenant = await requireActiveSubscription("lessons:create_edit");
   } catch (err: unknown) {
     return {
       success: false,
       data: null,
-      error: err instanceof Error ? err.message : "Authentication failed",
+      error: err instanceof Error ? err.message : "Authentication required",
     };
   }
 
-  const adminClient = createServerAdminClient();
+  const supabase = await createServerClient();
 
   for (const item of items) {
-    const { error } = await adminClient
+    const { error } = await supabase
       .from("lessons")
       .update({ sort_order: item.sort_order })
-      .eq("id", item.id);
+      .eq("id", item.id)
+      .eq("tenant_id", tenant.tenantId);
 
     if (error) {
       return {

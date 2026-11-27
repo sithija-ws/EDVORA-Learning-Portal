@@ -25,14 +25,75 @@ interface StudentNoteReadPageProps {
 export async function generateMetadata({ params }: StudentNoteReadPageProps) {
   const { noteId } = await params;
   const supabase = await createServerClient();
-  const { data: note } = await supabase
-    .from("notes")
-    .select("title")
-    .eq("id", noteId)
-    .single();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { title: "Read Note – Edvora" };
+  }
+
+  const [{ data: profile }, { data: enrollments }, { data: identities }, { data: note }] =
+    await Promise.all([
+      supabase.from("profiles").select("is_active").eq("id", user.id).maybeSingle(),
+      supabase.from("enrollments").select("batch_id, tenant_id").eq("student_id", user.id),
+      supabase.from("student_identities").select("tenant_id").eq("student_id", user.id),
+      supabase.from("notes").select("title, tenant_id").eq("id", noteId).maybeSingle(),
+    ]);
+
+  if (!profile || !profile.is_active || !note) {
+    return { title: "Read Note – Edvora" };
+  }
+
+  const studentTenantIds = Array.from(
+    new Set([
+      ...(identities?.map((i) => i.tenant_id) ?? []),
+      ...((enrollments?.map((e) => e.tenant_id).filter(Boolean) as string[]) ?? []),
+    ])
+  );
+
+  if (note.tenant_id && !studentTenantIds.includes(note.tenant_id)) {
+    return { title: "Read Note – Edvora" };
+  }
+
+  const enrolledBatchIds = enrollments?.map((e) => e.batch_id) ?? [];
+  if (enrolledBatchIds.length === 0) {
+    return { title: "Read Note – Edvora" };
+  }
+
+  const { data: matchingJunction } = await supabase
+    .from("note_batches")
+    .select("batch_id")
+    .eq("note_id", noteId)
+    .in("batch_id", enrolledBatchIds)
+    .limit(1)
+    .maybeSingle();
+
+  if (!matchingJunction) {
+    return { title: "Read Note – Edvora" };
+  }
+
+  if (note.tenant_id) {
+    const { data: sub } = await supabase
+      .from("tenant_subscriptions")
+      .select("status, current_period_end, trial_ends_at")
+      .eq("tenant_id", note.tenant_id)
+      .maybeSingle();
+
+    const now = new Date();
+    const isSubActive =
+      sub &&
+      ((sub.status === "active" &&
+        sub.current_period_end &&
+        new Date(sub.current_period_end) > now) ||
+        (sub.status === "trialing" &&
+          sub.trial_ends_at &&
+          new Date(sub.trial_ends_at) > now));
+
+    if (!isSubActive) {
+      return { title: "Read Note – Edvora" };
+    }
+  }
 
   return {
-    title: note ? `${note.title} – Edvora` : "Read Note – Edvora",
+    title: `${note.title} – Edvora`,
   };
 }
 
@@ -44,18 +105,18 @@ export default async function StudentNoteReadPage({
 
   // 1. Authenticate student
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const user = session?.user ?? (await supabase.auth.getUser()).data.user;
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     redirect("/login");
   }
 
-  // 2. Stage 1 concurrent fetch: profile, enrollments, note details, and note_batches in parallel
+  // 2. Stage 1 concurrent fetch: profile, enrollments, identities, note details, and note_batches in parallel
   const [
     { data: profile },
     { data: enrollments },
+    { data: identities },
     { data: noteData },
     { data: noteBatches },
   ] = await Promise.all([
@@ -66,7 +127,11 @@ export default async function StudentNoteReadPage({
       .single(),
     supabase
       .from("enrollments")
-      .select("batch_id")
+      .select("batch_id, tenant_id")
+      .eq("student_id", user.id),
+    supabase
+      .from("student_identities")
+      .select("tenant_id")
       .eq("student_id", user.id),
     supabase
       .from("notes")
@@ -75,7 +140,7 @@ export default async function StudentNoteReadPage({
       .single(),
     supabase
       .from("note_batches")
-      .select("batch_id")
+      .select("batch_id, tenant_id")
       .eq("note_id", noteId),
   ]);
 
@@ -88,8 +153,43 @@ export default async function StudentNoteReadPage({
   }
 
   const enrolledBatchIds = enrollments?.map((e) => e.batch_id) ?? [];
-  if (enrolledBatchIds.length === 0) {
+  const studentTenantIds = Array.from(
+    new Set([
+      ...(identities?.map((i) => i.tenant_id) ?? []),
+      ...((enrollments?.map((e) => e.tenant_id).filter(Boolean) as string[]) ?? []),
+    ])
+  );
+
+  // Cross-tenant verification: note must belong to student's tenant
+  if (
+    enrolledBatchIds.length === 0 ||
+    studentTenantIds.length === 0 ||
+    (noteData.tenant_id && !studentTenantIds.includes(noteData.tenant_id))
+  ) {
     notFound();
+  }
+
+  // Active subscription verification: Block access to protected learning content if trial/subscription is expired
+  if (noteData.tenant_id) {
+    const { data: sub } = await supabase
+      .from("tenant_subscriptions")
+      .select("status, current_period_end, trial_ends_at")
+      .eq("tenant_id", noteData.tenant_id)
+      .maybeSingle();
+
+    const now = new Date();
+    const isSubActive =
+      sub &&
+      ((sub.status === "active" &&
+        sub.current_period_end &&
+        new Date(sub.current_period_end) > now) ||
+        (sub.status === "trialing" &&
+          sub.trial_ends_at &&
+          new Date(sub.trial_ends_at) > now));
+
+    if (!isSubActive) {
+      notFound();
+    }
   }
 
   // Verify batch authorization: Note must belong to at least one enrolled batch

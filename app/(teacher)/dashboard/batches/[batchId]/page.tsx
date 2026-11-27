@@ -5,6 +5,7 @@ import React from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { requireTenantContext, getTenantContext } from "@/lib/auth/tenant";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StudentTable } from "@/components/students/StudentTable";
 import { Badge } from "@/components/ui/badge";
@@ -19,12 +20,17 @@ interface BatchDetailPageProps {
 
 export async function generateMetadata({ params }: BatchDetailPageProps) {
   const { batchId } = await params;
+  const tenantRes = await getTenantContext();
+  if (tenantRes.status !== "resolved") {
+    return { title: "Batch Details — Edvora" };
+  }
   const supabase = await createServerClient();
   const { data: batch } = await supabase
     .from("batches")
     .select("name")
     .eq("id", batchId)
-    .single();
+    .eq("tenant_id", tenantRes.context.tenantId)
+    .maybeSingle();
 
   return {
     title: batch ? `${batch.name} — Edvora` : "Batch Details — Edvora",
@@ -33,9 +39,10 @@ export async function generateMetadata({ params }: BatchDetailPageProps) {
 
 export default async function BatchDetailPage({ params }: BatchDetailPageProps) {
   const { batchId } = await params;
+  const tenant = await requireTenantContext();
   const supabase = await createServerClient();
 
-  // 1. Fetch batch information, enrollments, and all junction mappings concurrently in parallel
+  // 1. Fetch batch information, enrollments, and all junction mappings concurrently in parallel scoped to tenant
   const [
     batchRes,
     enrollmentsRes,
@@ -44,12 +51,12 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
     announcementsRes,
     batchNoteRes,
   ] = await Promise.all([
-    supabase.from("batches").select("*").eq("id", batchId).single(),
-    supabase.from("enrollments").select("student_id, created_at").eq("batch_id", batchId),
-    supabase.from("lesson_batches").select("lesson_id").eq("batch_id", batchId),
-    supabase.from("announcement_batches").select("announcement_id").eq("batch_id", batchId),
-    supabase.from("announcements").select("*").order("is_pinned", { ascending: false }).order("created_at", { ascending: false }),
-    supabase.from("note_batches").select("note_id").eq("batch_id", batchId),
+    supabase.from("batches").select("*").eq("id", batchId).eq("tenant_id", tenant.tenantId).single(),
+    supabase.from("enrollments").select("student_id, created_at").eq("batch_id", batchId).eq("tenant_id", tenant.tenantId),
+    supabase.from("lesson_batches").select("lesson_id").eq("batch_id", batchId).eq("tenant_id", tenant.tenantId),
+    supabase.from("announcement_batches").select("announcement_id").eq("batch_id", batchId).eq("tenant_id", tenant.tenantId),
+    supabase.from("announcements").select("*").eq("tenant_id", tenant.tenantId).order("is_pinned", { ascending: false }).order("created_at", { ascending: false }),
+    supabase.from("note_batches").select("note_id").eq("batch_id", batchId).eq("tenant_id", tenant.tenantId),
   ]);
 
   const batch = batchRes.data;
@@ -67,7 +74,7 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
     (a) => a.is_broadcast || scopedAnnIds.includes(a.id)
   );
 
-  // 2. Fetch full students, lessons, and notes concurrently in parallel
+  // 2. Fetch full students, lessons, and notes concurrently in parallel scoped to tenant
   const [profilesRes, lessonsRes, notesRes] = await Promise.all([
     studentIds.length > 0
       ? supabase
@@ -81,6 +88,7 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
           .from("lessons")
           .select("*")
           .in("id", lessonIds)
+          .eq("tenant_id", tenant.tenantId)
           .order("sort_order", { ascending: true })
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [] }),
@@ -89,6 +97,7 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
           .from("notes")
           .select("*")
           .in("id", noteIds)
+          .eq("tenant_id", tenant.tenantId)
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [] }),
   ]);

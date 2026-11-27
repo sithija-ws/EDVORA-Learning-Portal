@@ -5,6 +5,7 @@ import React from "react";
 import Link from "next/link";
 import { Plus, BookOpen } from "lucide-react";
 import { createServerClient } from "@/lib/supabase/server";
+import { requireTenantContext } from "@/lib/auth/tenant";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LessonCard } from "@/components/lessons/LessonCard";
 import type { Lesson, Batch } from "@/types";
@@ -23,6 +24,7 @@ export default async function TeacherLessonsPage({
   searchParams,
 }: LessonsPageProps) {
   const { batchId } = await searchParams;
+  const tenant = await requireTenantContext();
   const supabase = await createServerClient();
 
   let batchesData: Batch[] | null = null;
@@ -30,17 +32,22 @@ export default async function TeacherLessonsPage({
   let lessonsData: Lesson[] | null = null;
 
   if (!batchId) {
-    // Fast-path: When viewing all lessons (default), fetch batches, junctions, and lessons concurrently in 1 parallel roundtrip
+    // Fast-path: When viewing all lessons (default), fetch batches, junctions, and lessons concurrently in 1 parallel roundtrip scoped to tenant
     const [bRes, lbRes, lRes] = await Promise.all([
       supabase
         .from("batches")
         .select("*")
+        .eq("tenant_id", tenant.tenantId)
         .order("year", { ascending: false })
         .order("name", { ascending: true }),
-      supabase.from("lesson_batches").select("lesson_id, batch_id"),
+      supabase
+        .from("lesson_batches")
+        .select("lesson_id, batch_id")
+        .eq("tenant_id", tenant.tenantId),
       supabase
         .from("lessons")
         .select("*")
+        .eq("tenant_id", tenant.tenantId)
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: false }),
     ]);
@@ -48,14 +55,18 @@ export default async function TeacherLessonsPage({
     lessonBatchesData = lbRes.data;
     lessonsData = lRes.data;
   } else {
-    // When batchId filter is specified, fetch batches & junctions first to resolve batch-assigned lesson IDs
+    // When batchId filter is specified, fetch batches & junctions first to resolve batch-assigned lesson IDs scoped to tenant
     const [bRes, lbRes] = await Promise.all([
       supabase
         .from("batches")
         .select("*")
+        .eq("tenant_id", tenant.tenantId)
         .order("year", { ascending: false })
         .order("name", { ascending: true }),
-      supabase.from("lesson_batches").select("lesson_id, batch_id"),
+      supabase
+        .from("lesson_batches")
+        .select("lesson_id, batch_id")
+        .eq("tenant_id", tenant.tenantId),
     ]);
     batchesData = bRes.data;
     lessonBatchesData = lbRes.data;
@@ -71,6 +82,7 @@ export default async function TeacherLessonsPage({
       const { data: lData } = await supabase
         .from("lessons")
         .select("*")
+        .eq("tenant_id", tenant.tenantId)
         .in("id", scopedLessonIds)
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: false });

@@ -5,6 +5,7 @@ import React from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { requireTenantContext, getTenantContext } from "@/lib/auth/tenant";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PdfViewer } from "@/components/notes/PdfViewer";
 import { NoteDeleteButton } from "@/components/notes/NoteDeleteButton";
@@ -20,12 +21,17 @@ interface TeacherNoteDetailPageProps {
 
 export async function generateMetadata({ params }: TeacherNoteDetailPageProps) {
   const { noteId } = await params;
+  const tenantRes = await getTenantContext();
+  if (tenantRes.status !== "resolved") {
+    return { title: "Note Details – Edvora" };
+  }
   const supabase = await createServerClient();
   const { data: note } = await supabase
     .from("notes")
     .select("title")
     .eq("id", noteId)
-    .single();
+    .eq("tenant_id", tenantRes.context.tenantId)
+    .maybeSingle();
 
   return {
     title: note ? `${note.title} – Edvora` : "Note Details – Edvora",
@@ -36,19 +42,22 @@ export default async function TeacherNoteDetailPage({
   params,
 }: TeacherNoteDetailPageProps) {
   const { noteId } = await params;
+  const tenant = await requireTenantContext();
   const supabase = await createServerClient();
 
-  // 1. Fetch note details and assigned batch junctions concurrently in parallel
+  // 1. Fetch note details and assigned batch junctions concurrently in parallel scoped to tenant
   const [{ data: noteData }, { data: junctions }] = await Promise.all([
     supabase
       .from("notes")
       .select("*")
       .eq("id", noteId)
+      .eq("tenant_id", tenant.tenantId)
       .single(),
     supabase
       .from("note_batches")
       .select("batch_id")
-      .eq("note_id", noteId),
+      .eq("note_id", noteId)
+      .eq("tenant_id", tenant.tenantId),
   ]);
 
   if (!noteData) {
@@ -57,7 +66,7 @@ export default async function TeacherNoteDetailPage({
 
   const note: Note = noteData;
 
-  // 2. Fetch assigned batches
+  // 2. Fetch assigned batches scoped to tenant
   const batchIds = junctions?.map((j) => j.batch_id) ?? [];
   let batches: Batch[] = [];
 
@@ -65,7 +74,8 @@ export default async function TeacherNoteDetailPage({
     const { data: batchesData } = await supabase
       .from("batches")
       .select("*")
-      .in("id", batchIds);
+      .in("id", batchIds)
+      .eq("tenant_id", tenant.tenantId);
     batches = batchesData ?? [];
   }
 

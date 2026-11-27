@@ -4,6 +4,7 @@
 import React from "react";
 import { connection } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
+import { requireTenantContext } from "@/lib/auth/tenant";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { NoteForm } from "@/components/notes/NoteForm";
 import type { Batch } from "@/types";
@@ -21,11 +22,13 @@ interface NewNotePageProps {
 export default async function NewNotePage({ searchParams }: NewNotePageProps) {
   await connection();
   const { batchId } = await searchParams;
+  const tenant = await requireTenantContext();
   const supabase = await createServerClient();
 
   const { data: batchesData } = await supabase
     .from("batches")
     .select("*")
+    .eq("tenant_id", tenant.tenantId)
     .order("year", { ascending: false })
     .order("name", { ascending: true });
 

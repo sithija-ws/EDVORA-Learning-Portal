@@ -6,8 +6,10 @@ import React from "react";
 import Link from "next/link";
 import { Plus, Users, BookOpen, Megaphone, FileText } from "lucide-react";
 import { createServerClient } from "@/lib/supabase/server";
+import { requireTenantContext } from "@/lib/auth/tenant";
 import { BatchCard } from "@/components/batches/BatchCard";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { TrialBanner } from "@/components/subscription/TrialBanner";
 import type { Batch } from "@/types";
 
 export const instant = false;
@@ -17,16 +19,21 @@ export const metadata = {
 };
 
 export default async function TeacherDashboardPage() {
+  const tenant = await requireTenantContext();
   const supabase = await createServerClient();
 
-  // Fetch batches and all enrollments concurrently in a single parallel roundtrip
+  // Fetch batches and all enrollments concurrently in a single parallel roundtrip scoped to active tenant
   const [{ data: batchesData }, { data: enrollmentsData }] = await Promise.all([
     supabase
       .from("batches")
       .select("*")
+      .eq("tenant_id", tenant.tenantId)
       .order("year", { ascending: false })
       .order("name", { ascending: true }),
-    supabase.from("enrollments").select("batch_id"),
+    supabase
+      .from("enrollments")
+      .select("batch_id")
+      .eq("tenant_id", tenant.tenantId),
   ]);
 
   const batches: Batch[] = batchesData ?? [];
@@ -79,6 +86,14 @@ export default async function TeacherDashboardPage() {
       />
 
       <div className="p-4 sm:p-6 space-y-8">
+        <TrialBanner
+          isTrial={tenant.isTrial}
+          trialEndsAt={tenant.trialEndsAt}
+          trialRemainingSeconds={tenant.trialRemainingSeconds}
+          isSubscriptionActive={tenant.isSubscriptionActive}
+          subscriptionStatus={tenant.subscriptionStatus}
+        />
+
         {/* ── Stats Row ───────────────────────────────────────────── */}
         <div className="grid grid-cols-3 gap-3 sm:gap-4">
           {STATS.map(({ label, value, icon: Icon }) => (

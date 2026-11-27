@@ -31,13 +31,12 @@ export default async function StudentHomePage() {
 
   // 1. Authenticate
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const user = session?.user ?? (await supabase.auth.getUser()).data.user;
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // 2. Fetch profile & enrollments concurrently in a single parallel roundtrip
-  const [{ data: profile }, { data: enrollments }] = await Promise.all([
+  // 2. Fetch profile, enrollments, and student identities concurrently in parallel
+  const [{ data: profile }, { data: enrollments }, { data: identities }] = await Promise.all([
     supabase
       .from("profiles")
       .select("full_name, is_active, role")
@@ -45,21 +44,31 @@ export default async function StudentHomePage() {
       .single(),
     supabase
       .from("enrollments")
-      .select("batch_id")
+      .select("batch_id, tenant_id")
+      .eq("student_id", user.id),
+    supabase
+      .from("student_identities")
+      .select("tenant_id")
       .eq("student_id", user.id),
   ]);
 
   if (!profile || !profile.is_active) redirect("/disabled");
 
   const enrolledBatchIds = enrollments?.map((e) => e.batch_id) ?? [];
+  const studentTenantIds = Array.from(
+    new Set([
+      ...(identities?.map((i) => i.tenant_id) ?? []),
+      ...((enrollments?.map((e) => e.tenant_id).filter(Boolean) as string[]) ?? []),
+    ])
+  );
 
   let batches: Batch[] = [];
   let lessons: Lesson[] = [];
   let recentAnnouncements: Announcement[] = [];
   let recentNotes: Note[] = [];
 
-  if (enrolledBatchIds.length > 0) {
-    // 3. Stage 1 concurrent fetch: batches, junction mappings, and notices in parallel
+  if (enrolledBatchIds.length > 0 && studentTenantIds.length > 0) {
+    // 3. Stage 1 concurrent fetch: batches, junction mappings, and notices in parallel scoped to student's tenants
     const [
       batchesRes,
       lessonBatchesRes,
@@ -71,22 +80,27 @@ export default async function StudentHomePage() {
         .from("batches")
         .select("*")
         .in("id", enrolledBatchIds)
+        .in("tenant_id", studentTenantIds)
         .order("year", { ascending: false }),
       supabase
         .from("lesson_batches")
         .select("lesson_id")
-        .in("batch_id", enrolledBatchIds),
+        .in("batch_id", enrolledBatchIds)
+        .in("tenant_id", studentTenantIds),
       supabase
         .from("announcement_batches")
         .select("announcement_id")
-        .in("batch_id", enrolledBatchIds),
+        .in("batch_id", enrolledBatchIds)
+        .in("tenant_id", studentTenantIds),
       supabase
         .from("note_batches")
         .select("note_id")
-        .in("batch_id", enrolledBatchIds),
+        .in("batch_id", enrolledBatchIds)
+        .in("tenant_id", studentTenantIds),
       supabase
         .from("announcements")
         .select("*")
+        .in("tenant_id", studentTenantIds)
         .order("is_pinned", { ascending: false })
         .order("created_at", { ascending: false }),
     ]);
@@ -102,17 +116,19 @@ export default async function StudentHomePage() {
     );
 
     const allNotices = annDataRes.data ?? [];
+    const enrolledTenantIds = new Set(batches.map((b) => b.tenant_id));
     recentAnnouncements = allNotices
-      .filter((a) => a.is_broadcast || scopedAnnIds.includes(a.id))
+      .filter((a) => (a.is_broadcast && enrolledTenantIds.has(a.tenant_id)) || scopedAnnIds.includes(a.id))
       .slice(0, 3);
 
-    // 4. Stage 2 concurrent fetch: lessons and notes records in parallel
+    // 4. Stage 2 concurrent fetch: lessons and notes records in parallel scoped to student's tenants
     const [lessonsRes, notesRes] = await Promise.all([
       lessonIds.length > 0
         ? supabase
             .from("lessons")
             .select("*")
             .in("id", lessonIds)
+            .in("tenant_id", studentTenantIds)
             .order("sort_order", { ascending: true })
             .order("created_at", { ascending: false })
             .limit(6)
@@ -122,6 +138,7 @@ export default async function StudentHomePage() {
             .from("notes")
             .select("*")
             .in("id", noteIds)
+            .in("tenant_id", studentTenantIds)
             .order("created_at", { ascending: false })
             .limit(3)
         : Promise.resolve({ data: [] }),

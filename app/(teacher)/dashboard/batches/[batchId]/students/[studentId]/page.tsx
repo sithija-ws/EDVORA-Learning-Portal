@@ -4,6 +4,7 @@
 import React from "react";
 import { notFound } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { requireTenantContext, getTenantContext } from "@/lib/auth/tenant";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StudentForm } from "@/components/students/StudentForm";
 import { Badge } from "@/components/ui/badge";
@@ -17,12 +18,39 @@ interface StudentDetailPageProps {
 
 export async function generateMetadata({ params }: StudentDetailPageProps) {
   const { studentId } = await params;
+  const tenantRes = await getTenantContext();
+  if (tenantRes.status !== "resolved") {
+    return { title: "Student Details — Edvora" };
+  }
+  const tenant = tenantRes.context;
   const supabase = await createServerClient();
+
+  // Verify student belongs to this workspace via student_identities or enrollments
+  const [{ data: identity }, { data: enrollment }] = await Promise.all([
+    supabase
+      .from("student_identities")
+      .select("id")
+      .eq("tenant_id", tenant.tenantId)
+      .eq("student_id", studentId)
+      .maybeSingle(),
+    supabase
+      .from("enrollments")
+      .select("batch_id")
+      .eq("tenant_id", tenant.tenantId)
+      .eq("student_id", studentId)
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (!identity && !enrollment) {
+    return { title: "Student Details — Edvora" };
+  }
+
   const { data: student } = await supabase
     .from("profiles")
     .select("full_name")
     .eq("id", studentId)
-    .single();
+    .maybeSingle();
 
   return {
     title: student ? `${student.full_name} — Edvora` : "Student Details — Edvora",
@@ -33,6 +61,7 @@ export default async function StudentDetailPage({
   params,
 }: StudentDetailPageProps) {
   const { batchId, studentId } = await params;
+  const tenant = await requireTenantContext();
   const supabase = await createServerClient();
 
   // 1. Fetch student profile
@@ -46,18 +75,32 @@ export default async function StudentDetailPage({
     notFound();
   }
 
+  // 2. Verify student belongs to this workspace via student_identities or enrollments
+  const [{ data: identity }, { data: enrollmentsData }] = await Promise.all([
+    supabase
+      .from("student_identities")
+      .select("id")
+      .eq("tenant_id", tenant.tenantId)
+      .eq("student_id", studentId)
+      .maybeSingle(),
+    supabase
+      .from("enrollments")
+      .select("batch_id")
+      .eq("tenant_id", tenant.tenantId)
+      .eq("student_id", studentId),
+  ]);
+
+  if (!identity && (!enrollmentsData || enrollmentsData.length === 0)) {
+    notFound();
+  }
+
   const student: Profile = studentData;
 
-  // 2. Fetch student's current enrollments
-  const { data: enrollmentsData } = await supabase
-    .from("enrollments")
-    .select("batch_id")
-    .eq("student_id", studentId);
-
-  // 3. Fetch all batches to populate multi-batch selection
+  // 3. Fetch all batches for multi-batch assignment scoped to tenant
   const { data: allBatchesData } = await supabase
     .from("batches")
     .select("*")
+    .eq("tenant_id", tenant.tenantId)
     .order("year", { ascending: false })
     .order("name", { ascending: true });
 

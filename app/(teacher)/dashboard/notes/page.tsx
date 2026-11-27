@@ -5,6 +5,7 @@ import React from "react";
 import Link from "next/link";
 import { Plus, FileText } from "lucide-react";
 import { createServerClient } from "@/lib/supabase/server";
+import { requireTenantContext } from "@/lib/auth/tenant";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { NoteCard } from "@/components/notes/NoteCard";
 import type { Note, Batch } from "@/types";
@@ -23,6 +24,7 @@ export default async function TeacherNotesPage({
   searchParams,
 }: TeacherNotesPageProps) {
   const { batchId } = await searchParams;
+  const tenant = await requireTenantContext();
   const supabase = await createServerClient();
 
   let batchesData: Batch[] | null = null;
@@ -30,31 +32,40 @@ export default async function TeacherNotesPage({
   let notesData: Note[] | null = null;
 
   if (!batchId) {
-    // Fast-path: When viewing all notes (default), fetch batches, junctions, and notes concurrently in 1 parallel roundtrip
+    // Fast-path: When viewing all notes (default), fetch batches, junctions, and notes concurrently in 1 parallel roundtrip scoped to tenant
     const [bRes, nbRes, nRes] = await Promise.all([
       supabase
         .from("batches")
         .select("*")
+        .eq("tenant_id", tenant.tenantId)
         .order("year", { ascending: false })
         .order("name", { ascending: true }),
-      supabase.from("note_batches").select("note_id, batch_id"),
+      supabase
+        .from("note_batches")
+        .select("note_id, batch_id")
+        .eq("tenant_id", tenant.tenantId),
       supabase
         .from("notes")
         .select("*")
+        .eq("tenant_id", tenant.tenantId)
         .order("created_at", { ascending: false }),
     ]);
     batchesData = bRes.data;
     allNoteBatches = nbRes.data;
     notesData = nRes.data;
   } else {
-    // When batchId is present, fetch batches & junctions first to resolve scoped note IDs
+    // When batchId is present, fetch batches & junctions first to resolve scoped note IDs scoped to tenant
     const [bRes, nbRes] = await Promise.all([
       supabase
         .from("batches")
         .select("*")
+        .eq("tenant_id", tenant.tenantId)
         .order("year", { ascending: false })
         .order("name", { ascending: true }),
-      supabase.from("note_batches").select("note_id, batch_id"),
+      supabase
+        .from("note_batches")
+        .select("note_id, batch_id")
+        .eq("tenant_id", tenant.tenantId),
     ]);
     batchesData = bRes.data;
     allNoteBatches = nbRes.data;
@@ -70,6 +81,7 @@ export default async function TeacherNotesPage({
       const { data: nData } = await supabase
         .from("notes")
         .select("*")
+        .eq("tenant_id", tenant.tenantId)
         .in("id", scopedNoteIds)
         .order("created_at", { ascending: false });
       notesData = nData;

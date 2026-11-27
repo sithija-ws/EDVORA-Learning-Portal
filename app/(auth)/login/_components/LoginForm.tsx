@@ -1,14 +1,15 @@
 // app/(auth)/login/_components/LoginForm.tsx
-// Modern, tactile login form with input icons, password show/hide toggle, and instant feedback.
+// Modern, tactile login form supporting workspace-aware student and teacher logins.
 
 "use client";
 
 import { useActionState, useState } from "react";
+import Link from "next/link";
 import { login } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertCircle, Loader2, User, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { AlertCircle, Loader2, User, Lock, Eye, EyeOff, ArrowRight, Building2 } from "lucide-react";
 
 export function LoginForm() {
   const [state, formAction, isPending] = useActionState(login, null);
@@ -25,6 +26,33 @@ export function LoginForm() {
           <span>{state.error}</span>
         </div>
       )}
+
+      {/* Workspace Code Field (Optional for Teachers & Default Class) */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="workspace" className="text-xs font-bold text-foreground">
+            Workspace Code
+          </Label>
+          <span className="text-[10px] text-muted-foreground font-medium">
+            Students only (optional)
+          </span>
+        </div>
+        <div className="relative">
+          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted-foreground">
+            <Building2 className="h-4 w-4" />
+          </div>
+          <Input
+            id="workspace"
+            name="workspace"
+            type="text"
+            autoComplete="organization"
+            disabled={isPending}
+            placeholder="e.g. amila-physics (or leave blank)"
+            suppressHydrationWarning
+            className="h-11 rounded-xl border-border bg-muted/20 pl-10 text-sm transition-all focus:bg-background focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+      </div>
 
       {/* Username / Email Field */}
       <div className="space-y-1.5">
@@ -105,6 +133,32 @@ export function LoginForm() {
           </>
         )}
       </Button>
+
+      {/* Portal Selection Hints */}
+      <div className="grid grid-cols-2 gap-2 text-center text-xs">
+        <Link
+          href="/teacher/login"
+          className="rounded-lg border border-border bg-muted/30 py-1.5 px-2 font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+        >
+          Teacher Portal &rarr;
+        </Link>
+        <Link
+          href="/student/login"
+          className="rounded-lg border border-border bg-muted/30 py-1.5 px-2 font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+        >
+          Student Portal &rarr;
+        </Link>
+      </div>
+
+      {/* Teacher Onboarding Link */}
+      <div className="text-center pt-1">
+        <p className="text-xs text-muted-foreground">
+          New tuition teacher?{" "}
+          <Link href="/teacher/register" className="font-semibold text-primary hover:underline">
+            Apply for 72-Hour Free Trial
+          </Link>
+        </p>
+      </div>
     </form>
   );
 }

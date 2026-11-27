@@ -5,6 +5,7 @@ import React from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { requireTenantContext, getTenantContext } from "@/lib/auth/tenant";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { VideoPlayer } from "@/components/lessons/VideoPlayer";
 import { LessonDeleteButton } from "@/components/lessons/LessonDeleteButton";
@@ -20,12 +21,17 @@ interface LessonDetailPageProps {
 
 export async function generateMetadata({ params }: LessonDetailPageProps) {
   const { lessonId } = await params;
+  const tenantRes = await getTenantContext();
+  if (tenantRes.status !== "resolved") {
+    return { title: "Lesson — Edvora" };
+  }
   const supabase = await createServerClient();
   const { data: lesson } = await supabase
     .from("lessons")
     .select("title")
     .eq("id", lessonId)
-    .single();
+    .eq("tenant_id", tenantRes.context.tenantId)
+    .maybeSingle();
 
   return {
     title: lesson ? `${lesson.title} — Edvora` : "Lesson — Edvora",
@@ -36,19 +42,22 @@ export default async function TeacherLessonDetailPage({
   params,
 }: LessonDetailPageProps) {
   const { lessonId } = await params;
+  const tenant = await requireTenantContext();
   const supabase = await createServerClient();
 
-  // 1. Fetch lesson details and assigned batch junctions concurrently in parallel
+  // 1. Fetch lesson details and assigned batch junctions concurrently in parallel scoped to tenant
   const [{ data: lessonData }, { data: lessonBatches }] = await Promise.all([
     supabase
       .from("lessons")
       .select("*")
       .eq("id", lessonId)
+      .eq("tenant_id", tenant.tenantId)
       .single(),
     supabase
       .from("lesson_batches")
       .select("batch_id")
-      .eq("lesson_id", lessonId),
+      .eq("lesson_id", lessonId)
+      .eq("tenant_id", tenant.tenantId),
   ]);
 
   if (!lessonData) {
@@ -57,7 +66,7 @@ export default async function TeacherLessonDetailPage({
 
   const lesson: Lesson = lessonData;
 
-  // 2. Fetch assigned batches
+  // 2. Fetch assigned batches scoped to tenant
   const batchIds = lessonBatches?.map((lb) => lb.batch_id) ?? [];
   let assignedBatches: Batch[] = [];
 
@@ -66,6 +75,7 @@ export default async function TeacherLessonDetailPage({
       .from("batches")
       .select("*")
       .in("id", batchIds)
+      .eq("tenant_id", tenant.tenantId)
       .order("name", { ascending: true });
 
     assignedBatches = batches ?? [];

@@ -5,6 +5,7 @@ import React from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { createServerClient } from "@/lib/supabase/server";
+import { requireTenantContext } from "@/lib/auth/tenant";
 import { BatchCard } from "@/components/batches/BatchCard";
 import { PageHeader } from "@/components/layout/PageHeader";
 import type { Batch } from "@/types";
@@ -16,19 +17,23 @@ export const metadata = {
 };
 
 export default async function BatchesPage() {
+  const tenant = await requireTenantContext();
   const supabase = await createServerClient();
 
-  const { data: batchesData } = await supabase
-    .from("batches")
-    .select("*")
-    .order("year", { ascending: false })
-    .order("name", { ascending: true });
+  const [{ data: batchesData }, { data: enrollmentsData }] = await Promise.all([
+    supabase
+      .from("batches")
+      .select("*")
+      .eq("tenant_id", tenant.tenantId)
+      .order("year", { ascending: false })
+      .order("name", { ascending: true }),
+    supabase
+      .from("enrollments")
+      .select("batch_id")
+      .eq("tenant_id", tenant.tenantId),
+  ]);
 
   const batches: Batch[] = batchesData ?? [];
-
-  const { data: enrollmentsData } = await supabase
-    .from("enrollments")
-    .select("batch_id");
 
   const countMap: Record<string, number> = {};
   enrollmentsData?.forEach((e) => {

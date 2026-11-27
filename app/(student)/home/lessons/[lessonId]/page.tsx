@@ -25,14 +25,75 @@ interface StudentLessonWatchPageProps {
 export async function generateMetadata({ params }: StudentLessonWatchPageProps) {
   const { lessonId } = await params;
   const supabase = await createServerClient();
-  const { data: lesson } = await supabase
-    .from("lessons")
-    .select("title")
-    .eq("id", lessonId)
-    .single();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { title: "Watch Lesson – Edvora" };
+  }
+
+  const [{ data: profile }, { data: enrollments }, { data: identities }, { data: lesson }] =
+    await Promise.all([
+      supabase.from("profiles").select("is_active").eq("id", user.id).maybeSingle(),
+      supabase.from("enrollments").select("batch_id, tenant_id").eq("student_id", user.id),
+      supabase.from("student_identities").select("tenant_id").eq("student_id", user.id),
+      supabase.from("lessons").select("title, tenant_id").eq("id", lessonId).maybeSingle(),
+    ]);
+
+  if (!profile || !profile.is_active || !lesson) {
+    return { title: "Watch Lesson – Edvora" };
+  }
+
+  const studentTenantIds = Array.from(
+    new Set([
+      ...(identities?.map((i) => i.tenant_id) ?? []),
+      ...((enrollments?.map((e) => e.tenant_id).filter(Boolean) as string[]) ?? []),
+    ])
+  );
+
+  if (lesson.tenant_id && !studentTenantIds.includes(lesson.tenant_id)) {
+    return { title: "Watch Lesson – Edvora" };
+  }
+
+  const enrolledBatchIds = enrollments?.map((e) => e.batch_id) ?? [];
+  if (enrolledBatchIds.length === 0) {
+    return { title: "Watch Lesson – Edvora" };
+  }
+
+  const { data: matchingJunction } = await supabase
+    .from("lesson_batches")
+    .select("batch_id")
+    .eq("lesson_id", lessonId)
+    .in("batch_id", enrolledBatchIds)
+    .limit(1)
+    .maybeSingle();
+
+  if (!matchingJunction) {
+    return { title: "Watch Lesson – Edvora" };
+  }
+
+  if (lesson.tenant_id) {
+    const { data: sub } = await supabase
+      .from("tenant_subscriptions")
+      .select("status, current_period_end, trial_ends_at")
+      .eq("tenant_id", lesson.tenant_id)
+      .maybeSingle();
+
+    const now = new Date();
+    const isSubActive =
+      sub &&
+      ((sub.status === "active" &&
+        sub.current_period_end &&
+        new Date(sub.current_period_end) > now) ||
+        (sub.status === "trialing" &&
+          sub.trial_ends_at &&
+          new Date(sub.trial_ends_at) > now));
+
+    if (!isSubActive) {
+      return { title: "Watch Lesson – Edvora" };
+    }
+  }
 
   return {
-    title: lesson ? `${lesson.title} – Edvora` : "Watch Lesson – Edvora",
+    title: `${lesson.title} – Edvora`,
   };
 }
 
@@ -44,18 +105,18 @@ export default async function StudentLessonWatchPage({
 
   // 1. Authenticate student
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const user = session?.user ?? (await supabase.auth.getUser()).data.user;
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     redirect("/login");
   }
 
-  // 2. Stage 1 concurrent fetch: profile, enrollments, lesson, and lesson_batches in parallel
+  // 2. Stage 1 concurrent fetch: profile, enrollments, identities, lesson, and lesson_batches in parallel
   const [
     { data: profile },
     { data: enrollments },
+    { data: identities },
     { data: lessonData },
     { data: lessonBatches },
   ] = await Promise.all([
@@ -66,7 +127,11 @@ export default async function StudentLessonWatchPage({
       .single(),
     supabase
       .from("enrollments")
-      .select("batch_id")
+      .select("batch_id, tenant_id")
+      .eq("student_id", user.id),
+    supabase
+      .from("student_identities")
+      .select("tenant_id")
       .eq("student_id", user.id),
     supabase
       .from("lessons")
@@ -75,7 +140,7 @@ export default async function StudentLessonWatchPage({
       .single(),
     supabase
       .from("lesson_batches")
-      .select("batch_id")
+      .select("batch_id, tenant_id")
       .eq("lesson_id", lessonId),
   ]);
 
@@ -88,8 +153,43 @@ export default async function StudentLessonWatchPage({
   }
 
   const enrolledBatchIds = enrollments?.map((e) => e.batch_id) ?? [];
-  if (enrolledBatchIds.length === 0) {
+  const studentTenantIds = Array.from(
+    new Set([
+      ...(identities?.map((i) => i.tenant_id) ?? []),
+      ...((enrollments?.map((e) => e.tenant_id).filter(Boolean) as string[]) ?? []),
+    ])
+  );
+
+  // Cross-tenant verification: lesson must belong to student's tenant
+  if (
+    enrolledBatchIds.length === 0 ||
+    studentTenantIds.length === 0 ||
+    (lessonData.tenant_id && !studentTenantIds.includes(lessonData.tenant_id))
+  ) {
     notFound();
+  }
+
+  // Active subscription verification: Block access to protected learning content if trial/subscription is expired
+  if (lessonData.tenant_id) {
+    const { data: sub } = await supabase
+      .from("tenant_subscriptions")
+      .select("status, current_period_end, trial_ends_at")
+      .eq("tenant_id", lessonData.tenant_id)
+      .maybeSingle();
+
+    const now = new Date();
+    const isSubActive =
+      sub &&
+      ((sub.status === "active" &&
+        sub.current_period_end &&
+        new Date(sub.current_period_end) > now) ||
+        (sub.status === "trialing" &&
+          sub.trial_ends_at &&
+          new Date(sub.trial_ends_at) > now));
+
+    if (!isSubActive) {
+      notFound();
+    }
   }
 
   // Verify batch authorization: Lesson must belong to at least one enrolled batch

@@ -3,6 +3,7 @@
 
 import React from "react";
 import { createServerClient } from "@/lib/supabase/server";
+import { requireTenantContext } from "@/lib/auth/tenant";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { AnnouncementForm } from "@/components/announcements/AnnouncementForm";
 import type { Batch } from "@/types";
@@ -21,11 +22,13 @@ export default async function NewAnnouncementPage({
   searchParams,
 }: NewAnnouncementPageProps) {
   const { batchId } = await searchParams;
+  const tenant = await requireTenantContext();
   const supabase = await createServerClient();
 
   const { data: batchesData } = await supabase
     .from("batches")
     .select("*")
+    .eq("tenant_id", tenant.tenantId)
     .order("year", { ascending: false })
     .order("name", { ascending: true });
 

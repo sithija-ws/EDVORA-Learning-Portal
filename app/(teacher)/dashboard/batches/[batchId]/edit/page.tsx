@@ -4,6 +4,7 @@
 import React from "react";
 import { notFound } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { requireTenantContext, getTenantContext } from "@/lib/auth/tenant";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { BatchForm } from "@/components/batches/BatchForm";
 
@@ -15,12 +16,17 @@ interface EditBatchPageProps {
 
 export async function generateMetadata({ params }: EditBatchPageProps) {
   const { batchId } = await params;
+  const tenantRes = await getTenantContext();
+  if (tenantRes.status !== "resolved") {
+    return { title: "Edit Batch — Edvora" };
+  }
   const supabase = await createServerClient();
   const { data: batch } = await supabase
     .from("batches")
     .select("name")
     .eq("id", batchId)
-    .single();
+    .eq("tenant_id", tenantRes.context.tenantId)
+    .maybeSingle();
 
   return {
     title: batch ? `Edit ${batch.name} — Edvora` : "Edit Batch — Edvora",
@@ -29,12 +35,14 @@ export async function generateMetadata({ params }: EditBatchPageProps) {
 
 export default async function EditBatchPage({ params }: EditBatchPageProps) {
   const { batchId } = await params;
+  const tenant = await requireTenantContext();
   const supabase = await createServerClient();
 
   const { data: batch } = await supabase
     .from("batches")
     .select("*")
     .eq("id", batchId)
+    .eq("tenant_id", tenant.tenantId)
     .single();
 
   if (!batch) {

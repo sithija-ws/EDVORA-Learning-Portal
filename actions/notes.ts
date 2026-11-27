@@ -1,43 +1,29 @@
 // actions/notes.ts
-// Server Actions for PDF study notes management (Teacher only).
-// File uploads are handled via Supabase Storage using privileged admin client.
+// Server Actions for PDF study notes management (Staff only).
+// Fully migrated to tenant-aware authorization, explicit permissions, and tenant storage isolation.
 
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createServerAdminClient } from "@/lib/supabase/server";
-import { assertTeacher } from "@/lib/auth/assert";
+import { createServerClient } from "@/lib/supabase/server";
+import { requireActiveSubscription } from "@/lib/auth/tenant";
 import { createNoteSchema, updateNoteSchema } from "@/lib/validators/note";
 import { MAX_PDF_FILE_SIZE } from "@/lib/constants";
 import type { ActionResult } from "@/types";
 import type { Database } from "@/types/database";
 
 /**
- * Ensures the notes storage bucket exists and is public.
- */
-async function ensureNotesBucket(adminClient: ReturnType<typeof createServerAdminClient>) {
-  try {
-    await adminClient.storage.createBucket("notes", {
-      public: true,
-      fileSizeLimit: MAX_PDF_FILE_SIZE,
-      allowedMimeTypes: ["application/pdf"],
-    });
-  } catch {
-    // Bucket likely already exists, ignore
-  }
-}
-
-/**
  * Creates a new note with PDF upload and assigns it to batches.
+ * Scopes storage path under {tenant_id}/* and records under tenant_id.
  */
 export async function createNote(
   _prevState: ActionResult<void> | null,
   formData: FormData
 ): Promise<ActionResult<void>> {
-  let teacherId: string;
+  let tenant;
   try {
-    teacherId = await assertTeacher();
+    tenant = await requireActiveSubscription("notes:upload_manage");
   } catch (err: unknown) {
     return {
       success: false,
@@ -67,7 +53,23 @@ export async function createNote(
     };
   }
 
-  const adminClient = createServerAdminClient();
+  const supabase = await createServerClient();
+
+  // Validate that all target batches belong to the caller's tenant
+  const { data: validBatches, error: batchCheckError } = await supabase
+    .from("batches")
+    .select("id")
+    .eq("tenant_id", tenant.tenantId)
+    .in("id", validation.data.batch_ids);
+
+  if (batchCheckError || !validBatches || validBatches.length !== validation.data.batch_ids.length) {
+    return {
+      success: false,
+      data: null,
+      error: "One or more selected batches do not exist or belong to another workspace",
+    };
+  }
+
   let finalFileUrl = externalUrl ?? "";
   let finalFileName = "document.pdf";
   let finalFileSize: number | null = null;
@@ -90,13 +92,12 @@ export async function createNote(
       };
     }
 
-    await ensureNotesBucket(adminClient);
-
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const storagePath = `${Date.now()}_${sanitizedName}`;
+    // Multi-tenant storage path: {tenant_id}/{timestamp}_{filename}
+    const storagePath = `${tenant.tenantId}/${Date.now()}_${sanitizedName}`;
     const fileBuffer = Buffer.from(await file.arrayBuffer());
 
-    const { error: uploadError } = await adminClient.storage
+    const { error: uploadError } = await supabase.storage
       .from("notes")
       .upload(storagePath, fileBuffer, {
         contentType: "application/pdf",
@@ -111,7 +112,7 @@ export async function createNote(
       };
     }
 
-    const { data: urlData } = adminClient.storage
+    const { data: urlData } = supabase.storage
       .from("notes")
       .getPublicUrl(storagePath);
 
@@ -129,16 +130,17 @@ export async function createNote(
     finalFileName = title.replace(/[^a-zA-Z0-9_-]/g, "_") + ".pdf";
   }
 
-  // Insert Note record
-  const { data: insertedNote, error: insertError } = await adminClient
+  // Insert Note record scoped to tenant
+  const { data: insertedNote, error: insertError } = await supabase
     .from("notes")
     .insert({
+      tenant_id: tenant.tenantId,
       title: validation.data.title,
       description: validation.data.description ?? null,
       file_url: finalFileUrl,
       file_name: finalFileName,
       file_size: finalFileSize,
-      created_by: teacherId,
+      created_by: tenant.userId,
     })
     .select("id")
     .single();
@@ -151,18 +153,24 @@ export async function createNote(
     };
   }
 
-  // Insert batch assignments
+  // Insert batch assignments scoped to tenant
   const junctionRows = validation.data.batch_ids.map((bId) => ({
+    tenant_id: tenant.tenantId,
     note_id: insertedNote.id,
     batch_id: bId,
   }));
 
-  const { error: junctionError } = await adminClient
+  const { error: junctionError } = await supabase
     .from("note_batches")
     .insert(junctionRows);
 
   if (junctionError) {
-    await adminClient.from("notes").delete().eq("id", insertedNote.id);
+    await supabase
+      .from("notes")
+      .delete()
+      .eq("id", insertedNote.id)
+      .eq("tenant_id", tenant.tenantId);
+
     return {
       success: false,
       data: null,
@@ -179,15 +187,16 @@ export async function createNote(
 }
 
 /**
- * Updates an existing note.
+ * Updates an existing note and verifies tenant ownership.
  */
 export async function updateNote(
   noteId: string,
   _prevState: ActionResult<void> | null,
   formData: FormData
 ): Promise<ActionResult<void>> {
+  let tenant;
   try {
-    await assertTeacher();
+    tenant = await requireActiveSubscription("notes:upload_manage");
   } catch (err: unknown) {
     return {
       success: false,
@@ -217,9 +226,41 @@ export async function updateNote(
     };
   }
 
-  const adminClient = createServerAdminClient();
+  const supabase = await createServerClient();
 
-  // If a new PDF file was provided, upload it
+  // Verify note exists and belongs to this tenant
+  const { data: existingNote, error: findError } = await supabase
+    .from("notes")
+    .select("id, file_url")
+    .eq("id", noteId)
+    .eq("tenant_id", tenant.tenantId)
+    .single();
+
+  if (findError || !existingNote) {
+    return {
+      success: false,
+      data: null,
+      error: "Note not found or access denied",
+    };
+  }
+
+  // If new batches provided, validate their tenant ownership
+  if (validation.data.batch_ids && validation.data.batch_ids.length > 0) {
+    const { data: validBatches, error: batchCheckError } = await supabase
+      .from("batches")
+      .select("id")
+      .eq("tenant_id", tenant.tenantId)
+      .in("id", validation.data.batch_ids);
+
+    if (batchCheckError || !validBatches || validBatches.length !== validation.data.batch_ids.length) {
+      return {
+        success: false,
+        data: null,
+        error: "One or more selected batches do not exist or belong to another workspace",
+      };
+    }
+  }
+
   const updatePayload: Database["public"]["Tables"]["notes"]["Update"] = {
     title: validation.data.title,
     description: validation.data.description ?? null,
@@ -243,13 +284,11 @@ export async function updateNote(
       };
     }
 
-    await ensureNotesBucket(adminClient);
-
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const storagePath = `${Date.now()}_${sanitizedName}`;
+    const storagePath = `${tenant.tenantId}/${Date.now()}_${sanitizedName}`;
     const fileBuffer = Buffer.from(await file.arrayBuffer());
 
-    const { error: uploadError } = await adminClient.storage
+    const { error: uploadError } = await supabase.storage
       .from("notes")
       .upload(storagePath, fileBuffer, {
         contentType: "application/pdf",
@@ -264,7 +303,7 @@ export async function updateNote(
       };
     }
 
-    const { data: urlData } = adminClient.storage
+    const { data: urlData } = supabase.storage
       .from("notes")
       .getPublicUrl(storagePath);
 
@@ -275,10 +314,11 @@ export async function updateNote(
     updatePayload.file_url = externalUrl;
   }
 
-  const { error: updateError } = await adminClient
+  const { error: updateError } = await supabase
     .from("notes")
     .update(updatePayload)
-    .eq("id", noteId);
+    .eq("id", noteId)
+    .eq("tenant_id", tenant.tenantId);
 
   if (updateError) {
     return {
@@ -290,14 +330,19 @@ export async function updateNote(
 
   // Update batch assignments if provided
   if (validation.data.batch_ids && validation.data.batch_ids.length > 0) {
-    await adminClient.from("note_batches").delete().eq("note_id", noteId);
+    await supabase
+      .from("note_batches")
+      .delete()
+      .eq("note_id", noteId)
+      .eq("tenant_id", tenant.tenantId);
 
     const junctionRows = validation.data.batch_ids.map((bId) => ({
+      tenant_id: tenant.tenantId,
       note_id: noteId,
       batch_id: bId,
     }));
 
-    await adminClient.from("note_batches").insert(junctionRows);
+    await supabase.from("note_batches").insert(junctionRows);
   }
 
   revalidatePath("/dashboard/notes");
@@ -311,10 +356,12 @@ export async function updateNote(
 
 /**
  * Deletes a note and its batch assignments.
+ * Enforces tenant boundary and permissions.
  */
 export async function deleteNote(noteId: string): Promise<ActionResult<void>> {
+  let tenant;
   try {
-    await assertTeacher();
+    tenant = await requireActiveSubscription("notes:delete");
   } catch (err: unknown) {
     return {
       success: false,
@@ -323,9 +370,41 @@ export async function deleteNote(noteId: string): Promise<ActionResult<void>> {
     };
   }
 
-  const adminClient = createServerAdminClient();
+  const supabase = await createServerClient();
 
-  const { error } = await adminClient.from("notes").delete().eq("id", noteId);
+  const { data: existingNote, error: findError } = await supabase
+    .from("notes")
+    .select("id, file_url")
+    .eq("id", noteId)
+    .eq("tenant_id", tenant.tenantId)
+    .single();
+
+  if (findError || !existingNote) {
+    return {
+      success: false,
+      data: null,
+      error: "Note not found or access denied",
+    };
+  }
+
+  // Attempt storage file cleanup if stored in tenant namespace
+  try {
+    const urlParts = existingNote.file_url.split("/notes/");
+    if (urlParts.length > 1) {
+      const filePath = decodeURIComponent(urlParts[1]);
+      if (filePath.startsWith(`${tenant.tenantId}/`)) {
+        await supabase.storage.from("notes").remove([filePath]);
+      }
+    }
+  } catch {
+    // Non-blocking storage removal
+  }
+
+  const { error } = await supabase
+    .from("notes")
+    .delete()
+    .eq("id", noteId)
+    .eq("tenant_id", tenant.tenantId);
 
   if (error) {
     return {

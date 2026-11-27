@@ -4,6 +4,7 @@
 import React from "react";
 import { notFound } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { requireTenantContext, getTenantContext } from "@/lib/auth/tenant";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LessonForm } from "@/components/lessons/LessonForm";
 import type { Lesson, Batch } from "@/types";
@@ -16,12 +17,17 @@ interface EditLessonPageProps {
 
 export async function generateMetadata({ params }: EditLessonPageProps) {
   const { lessonId } = await params;
+  const tenantRes = await getTenantContext();
+  if (tenantRes.status !== "resolved") {
+    return { title: "Edit Lesson — Edvora" };
+  }
   const supabase = await createServerClient();
   const { data: lesson } = await supabase
     .from("lessons")
     .select("title")
     .eq("id", lessonId)
-    .single();
+    .eq("tenant_id", tenantRes.context.tenantId)
+    .maybeSingle();
 
   return {
     title: lesson ? `Edit ${lesson.title} — Edvora` : "Edit Lesson — Edvora",
@@ -32,13 +38,15 @@ export default async function EditLessonPage({
   params,
 }: EditLessonPageProps) {
   const { lessonId } = await params;
+  const tenant = await requireTenantContext();
   const supabase = await createServerClient();
 
-  // 1. Fetch lesson
+  // 1. Fetch lesson scoped to tenant
   const { data: lessonData } = await supabase
     .from("lessons")
     .select("*")
     .eq("id", lessonId)
+    .eq("tenant_id", tenant.tenantId)
     .single();
 
   if (!lessonData) {
@@ -47,18 +55,20 @@ export default async function EditLessonPage({
 
   const lesson: Lesson = lessonData;
 
-  // 2. Fetch current batch assignments
+  // 2. Fetch current batch assignments scoped to tenant
   const { data: lessonBatches } = await supabase
     .from("lesson_batches")
     .select("batch_id")
-    .eq("lesson_id", lessonId);
+    .eq("lesson_id", lessonId)
+    .eq("tenant_id", tenant.tenantId);
 
   const currentBatchIds = lessonBatches?.map((lb) => lb.batch_id) ?? [];
 
-  // 3. Fetch all batches
+  // 3. Fetch all batches scoped to tenant
   const { data: batchesData } = await supabase
     .from("batches")
     .select("*")
+    .eq("tenant_id", tenant.tenantId)
     .order("year", { ascending: false })
     .order("name", { ascending: true });
 

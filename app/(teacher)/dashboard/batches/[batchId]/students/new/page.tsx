@@ -4,6 +4,7 @@
 import React from "react";
 import { notFound } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { requireTenantContext } from "@/lib/auth/tenant";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StudentForm } from "@/components/students/StudentForm";
 import type { Batch } from "@/types";
@@ -20,23 +21,26 @@ export const metadata = {
 
 export default async function NewStudentPage({ params }: NewStudentPageProps) {
   const { batchId } = await params;
+  const tenant = await requireTenantContext();
   const supabase = await createServerClient();
 
-  // 1. Fetch current batch
+  // 1. Fetch current batch scoped to tenant
   const { data: currentBatch } = await supabase
     .from("batches")
     .select("name")
     .eq("id", batchId)
+    .eq("tenant_id", tenant.tenantId)
     .single();
 
   if (!currentBatch) {
     notFound();
   }
 
-  // 2. Fetch all batches for multi-batch assignment
+  // 2. Fetch all batches for multi-batch assignment scoped to tenant
   const { data: allBatchesData } = await supabase
     .from("batches")
     .select("*")
+    .eq("tenant_id", tenant.tenantId)
     .order("year", { ascending: false })
     .order("name", { ascending: true });
 
